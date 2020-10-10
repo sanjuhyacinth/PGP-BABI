@@ -1,0 +1,218 @@
+---
+title: "FACTOR ANALYSIS - Hair.csv"
+author: "Sanju Hyacinth C"
+date: "3 June 2019"
+output:
+  word_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+setwd("C:/Users/Sandy's XPS/Downloads/R downloads")
+getwd()
+
+Hairdata = read.csv("Factor-Hair-Revised.csv", header = TRUE)
+Hairdata
+
+Hairnew = Hairdata[,-1]
+Hairnew
+
+table(is.na(Hairnew))
+
+summary(Hairnew)
+
+str(Hairnew)
+
+names(Hairnew)
+
+```
+
+```{r}
+
+# CORRELATION 
+
+library(corrplot)
+
+Haircorr = cor(Hairnew)
+Haircorr
+
+corrplot(Haircorr, method = "color",type = "upper", title = "Correlation Matrix", tl.cex = 0.8, tl.col = "black")
+
+```
+
+## QUESTION 1: MULTI - COLLINEARITY
+
+  The dependent variable being, customer satisfaction is moderately or highly correlated with almost all the other independent variables, like poduct quality, complait resolution, delivery speed, etc. 
+  
+  But we also find that there is a correlation between th independnt variables, for example, there exists a very high correlation between delivery speed and complain resolution, sales force image and E-Commerce, Warranty claim and technical support.
+    
+  We can thus confirm that there is **evidence of multi collinearity in the data**
+    
+```{r}
+
+plot(Hairnew$CompRes, Hairnew$DelSpeed, col = "aquamarine3", pch = 16)
+  
+```
+
+## QUESTION 2 - FACTOR ANALYSIS
+
+  To find out if there is a possibility of variable reduction in the data, we use the _Bartlett Sphericity Test_ 
+  
+```{r}
+
+# Bartlett Sphericity Test for checking the possibility  
+# of data dimension reduction
+
+library(psych)
+
+cortest.bartlett(Haircorr,nrow(Hairnew))
+
+
+# H0 : Data dimension reduction is not possible
+# Ha : Dimension reduction is possible
+
+```
+
+  Since the p value is very much **lesser than 0.05**, we can conclude that the data dimensions can still be reduced to minimum factors
+  
+
+## QUESTION 3 - DIMENSION REDUCTION TO 4 FACTORS
+ 
+### METHOD1: KAIZER RULE OF EIGEN VALUES
+
+
+  In Kaizer rule, we take the number of factors basis the eigen values that are **greater than or equal to 1**.  In doing so, we find that the overall variables can be reduced to just 4 factors
+  
+
+```{r}
+
+EV = eigen(Haircorr)
+EV
+
+# Extracting the eigen values separately
+
+EValues = EV$values
+EValues
+
+EVectors = EV$vectors
+EVectors
+
+print(EValues, digits = 4)
+
+# this is one method
+
+```
+
+
+### METHOD2: SCREE PLOT ANALYSIS
+
+  Another method that is used to determine the number of factors is a _Sree plot_. A scree plot displays the proportion of the total variation in a dataset that is explained by each of the components in a principle component analysis. It helps you to **identify how many of the components are needed to summarise the data.** 
+  
+  
+```{r}
+
+EValues
+
+Factor = c(1,2,3,4,5,6,7,8,9,10,11,12)
+Factor
+
+Scree = data.frame(Factor,EValues)
+
+plot(Scree, main = "Scree Plot", sub = "To find number of factors", xlab = "Factors", ylab = "Eigen Values", col = "tomato", type = "o", pch = 16)
+
+plot.default(Scree, main = "Scree Plot", sub = "To find number of factors", xlab = "Factors", ylab = "Eigen Values", col = "tomato", type = "o", pch = 16, xlim = c(1,12), ylim = c(0,4.5))
+
+
+```
+  
+  According to the scree plot, the number of factors in the plot uptil which, the eigen value drastically decreases to form an **elbow**, can be taken. In the above scree plot, we find that after factor 5, an elbow is formed as the below values are smaller and negligable. Hence, according to scree plot upo 5 factors an be taken under consideration
+  
+  But since the 5th factor explains very little on the variance, we consider the eigen values equal to or more than 1 as per _Kaizer's method_.
+  
+  **Hence the ideal number of factors is reduced to 4**
+  
+  
+## PRINCIPAL COMPONENT ANALYSIS
+
+```{r}
+
+PCAHair = principal(Hairnew, nfactors = 4, rotate = "none")
+PCAHair
+
+PCAHair2 = principal(Hairnew, nfactors = 4, rotate = "varimax")
+PCAHair2
+
+# We can confirm that 4 factors can explain maximum variation 
+
+```
+
+  Rotation may not be needed for the data, as we can distinguish as to which principle component can explain the variables well. 
+  
+  * PC1 explains **43%** of the variance
+  * PC2 with **27%** , PC3 with **18%** and PC4 with **13%**
+  
+And we find that the 4 factors can cummulatively explain the **total variance** 
+
+
+## QUESTION 4 - FACTORS NAMING:
+
+
+  * PC1 includes Complaint resolution, Product line, Order and Billing, Delivery speed which are major lookouts for purchasing. Hence, named **Purchase parameters** 
+  
+  * PC2 has E-Commerce,Advertising Sales force image and Competent pricing Hence grouped under **Market Focus**
+  
+  * PC3 comprises of Technical support and Warranty claim, hence included under **Support**
+  
+  * PC4 comprises of product quality and grouped to **Quality**
+  
+  
+```{r}
+
+PCAHairplot = plot(PCAHair, row.names(PCAHair$loadings))
+
+print(PCAHair$scores)
+
+```
+
+
+## QUESTION 5 - REGRESSION MODEL:
+
+```{r}
+attach(Hairdata)
+
+
+PCAHregres1 = lm(Satisfaction~ProdLine+CompRes+OrdBilling+DelSpeed)
+summary(PCAHregres1)
+
+# In this model PCAHregres1, we find that Product line is a sgnificant factor determining satsfaction
+
+PCAHregres2 = lm(Satisfaction~Ecom+Advertising+SalesFImage+ComPricing)
+summary(PCAHregres2)
+
+# Model 2 suggests Sales force image and Competent pricing as highly significan factors whereas advertising is not significant in determining satisfaction
+
+PCAHregres3 = lm(Satisfaction~TechSup+WartyClaim)
+summary(PCAHregres3)
+
+# Model3 is not significant at all
+
+PCAHregres4 = lm(Satisfaction~ProdQual)
+summary(PCAHregres4)
+
+# MOdel4 suggests Product quality as highly significant
+
+PCAHregres = lm(Satisfaction~ProdLine+DelSpeed+CompRes+OrdBilling+ProdQual+Ecom+TechSup+Advertising+SalesFImage+ComPricing+WartyClaim)
+summary(PCAHregres)
+
+# The overall model suggest that the most signiicant factors of satisfaction are
+# Product quality, Ecommerce and Sales force image, although in model 2 competitive pricing was a major factor
+
+# The 4th model with a p-value: 2.901e-07 holds significant
+```
+
+  The above model suggests that product quality, sales force image and Ecommerce are the most significant influencers of satisfaction
+  

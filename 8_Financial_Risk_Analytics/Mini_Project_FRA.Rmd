@@ -1,0 +1,1313 @@
+---
+title: "Project - FRA"
+author: "Sanju Hyacinth C"
+date: "17/01/2020"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+
+# PACKAGES:
+
+
+# install.packages("StatMeasures")
+# install.packages("blorr")
+# install.packages("gains")
+
+```
+
+
+## DATA LOADING:
+
+```{r}
+
+#LOADING DATA:
+
+setwd("D:/R Progms/Financial and Risk analytics")
+
+dev_data = readxl::read_excel("raw-data.xlsx")
+View(dev_data)
+
+val_data = readxl::read_excel("validation_data.xlsx")
+View(val_data)
+
+
+```
+
+```{r}
+
+# Summary and Structure:
+# MAIN DATA:
+
+summary(dev_data)
+# 
+
+str(dev_data)
+# Most of the variables are numerics
+# A few of the variables are by default assigned as characters but will be converted to numerics
+# There is a large number of NAs present in the data
+
+# VALIDATION DATA:
+
+summary(val_data)
+
+str(val_data)
+# The same thing goes with the validation set
+# We will have to change the datatype for some variables.
+# A lot more NA values
+
+```
+
+
+```{r}
+
+dim(dev_data)
+
+names(dev_data)
+
+# Removing the variable deposits as all the values are NA and also the number variable as it is just an info:
+# Both main data and validation data:
+
+dev_data = dev_data[,-c(1,22)]
+val_data = val_data[,-c(1,22)]
+
+# CHANGING THE DATA TYPE OF VARIABLES:
+
+# MAIN DATA:
+dev_data$`Creditors turnover` = as.numeric(dev_data$`Creditors turnover`)
+dev_data$`Debtors turnover` = as.numeric(dev_data$`Debtors turnover`)
+dev_data$`Finished goods turnover` = as.numeric(dev_data$`Finished goods turnover`)
+dev_data$`WIP turnover` = as.numeric(dev_data$`WIP turnover`)
+dev_data$`Raw material turnover` = as.numeric(dev_data$`Raw material turnover`)
+dev_data$`Shares outstanding` = as.numeric(dev_data$`Shares outstanding`)
+dev_data$`Equity face value` = as.numeric(dev_data$`Equity face value`)
+dev_data$`PE on BSE` = as.numeric(dev_data$`PE on BSE`)
+
+# VALIDATION SET:
+val_data$`Creditors turnover` = as.numeric(val_data$`Creditors turnover`)
+val_data$`Debtors turnover` = as.numeric(val_data$`Debtors turnover`)
+val_data$`Finished goods turnover` = as.numeric(val_data$`Finished goods turnover`)
+val_data$`WIP turnover` = as.numeric(val_data$`WIP turnover`)
+val_data$`Raw material turnover` = as.numeric(val_data$`Raw material turnover`)
+val_data$`Shares outstanding` = as.numeric(val_data$`Shares outstanding`)
+val_data$`Equity face value` = as.numeric(val_data$`Equity face value`)
+val_data$`PE on BSE` = as.numeric(val_data$`PE on BSE`)
+
+# number of nas present:
+sum(is.na(dev_data))
+
+```
+
+```{r}
+
+## Let us create a variable DEFAULT which will be our dependent variable:
+
+Defc = ifelse(dev_data$`Networth Next Year`>0,0,1)
+
+summary(Defc)
+# Has a mean of 0.06862
+
+summary(as.factor(Defc))
+# (243/(3298+243))
+# 0.06862468
+#1-(243/(3298+243))
+#0.9313753
+
+# The ratio is that 93% have not defaulted and about 6.9% have defaulted
+
+dev_data = cbind(dev_data, Defc)
+
+# Before doimg the logistic model we will do smote to balance the data
+# View(dev_data)
+
+
+```
+
+
+```{r}
+
+# CHECKING FOR OUTLIERS:
+
+library(car)
+
+mod = lm(dev_data$`Networth Next Year`~., data = dev_data)
+
+outlierTest(mod)
+
+# The below are the rows with most extreme values  
+#3449, 3020, 3131, 3456, 3154, 2969, 3102, 2898, 3520, 2966
+
+# We may want to remove these rows with most of the extreme values:
+# For example, below is the row 2898 with many extreme values.
+# 2898	40237.4	66167.8	31245.5	36930.9	451.9	35133.1	2249.7	6635.7	3423.4	3198.3	17.97	9.27	6.09	8.66	8.44	35502.4	789.1	140.2	933.1	30312.4	28318.3	4602.5	2001.5	31245.5	18911.6	59563.8	1.06	0.60	12.26	3830.4	11042.5	38525.3	11010.1	-3633.9	0.43	0.75	0.91	0.02	2.64	9.79	6.49	14.46	11.49	5.85	93305187	10	20.74	20.74	66167.8	51.20
+
+# Let us see how to treat the other variables and obs after removing these 10 rows
+
+dev_data = dev_data[-c(3449, 3020, 3131, 3456, 3154, 2969, 3102, 2898, 3520, 2966), ]
+
+```
+
+
+```{r}
+
+# OUTLIERS TREATMENT:
+
+treatOut <- function(x) {
+  quant <- quantile(x, probs=c(.25, .75), na.rm = T)
+  cap <- quantile(x, probs=c(.05, .95), na.rm = T)
+  D <- 1.5 * IQR(x, na.rm = T)
+  x[ x < (quant[1] - D )] <- cap[1]
+  x[ x > (quant[2] + D) ] <- cap[2]
+  return(x)
+}
+
+# Doing the above line over and over for all of the columns in your data frame
+
+# Networth Next Year
+dev_data$`Networth Next Year`= treatOut(dev_data$`Networth Next Year`)
+summary(dev_data$`Networth Next Year`)
+
+# Total Assets
+dev_data$`Total assets`= treatOut(dev_data$`Total assets`)
+summary(dev_data$`Total assets`)
+
+# `Net worth`
+dev_data$`Net worth`= treatOut(dev_data$`Net worth`)
+summary(dev_data$`Net worth`)
+
+# `Total income`
+dev_data$`Total income`= treatOut(dev_data$`Total income`)
+summary(dev_data$`Total income`)
+
+# `Change in stock`
+dev_data$`Change in stock`= treatOut(dev_data$`Change in stock`)
+summary(dev_data$`Change in stock`)
+
+# `Total expenses`
+dev_data$`Total expenses`= treatOut(dev_data$`Total expenses`)
+summary(dev_data$`Total expenses`)
+
+# `Profit after tax`
+dev_data$`Profit after tax`= treatOut(dev_data$`Profit after tax`)
+summary(dev_data$`Profit after tax`)
+
+# PBDITA
+dev_data$PBDITA= treatOut(dev_data$PBDITA)
+summary(dev_data$PBDITA)
+
+# PBT
+dev_data$PBT= treatOut(dev_data$PBT)
+summary(dev_data$PBT)
+
+# `Cash profit`
+dev_data$`Cash profit`= treatOut(dev_data$`Cash profit`)
+summary(dev_data$`Cash profit`)
+
+# `PBDITA as % of total income`
+dev_data$`PBDITA as % of total income`= treatOut(dev_data$`PBDITA as % of total income`)
+summary(dev_data$`PBDITA as % of total income`)
+
+# `PBT as % of total income`
+dev_data$`PBT as % of total income`= treatOut(dev_data$`PBT as % of total income`)
+summary(dev_data$`PBT as % of total income`)
+
+# `PAT as % of total income`
+dev_data$`PAT as % of total income`= treatOut(dev_data$`PAT as % of total income`)
+summary(dev_data$`PAT as % of total income`)
+
+# `Cash profit as % of total income`
+dev_data$`Cash profit as % of total income`= treatOut(dev_data$`Cash profit as % of total income`)
+summary(dev_data$`Cash profit as % of total income`)
+
+# `PAT as % of net worth`
+dev_data$`PAT as % of net worth`= treatOut(dev_data$`PAT as % of net worth`)
+summary(dev_data$`PAT as % of net worth`)
+
+# Sales
+dev_data$Sales= treatOut(dev_data$Sales)
+summary(dev_data$Sales)
+
+# `Income from financial services`
+dev_data$`Income from financial services`= treatOut(dev_data$`Income from financial services`)
+summary(dev_data$`Income from financial services`)
+
+# `Other income`
+dev_data$`Other income`= treatOut(dev_data$`Other income`)
+summary(dev_data$`Other income`)
+
+# `Total capital`
+dev_data$`Total capital`= treatOut(dev_data$`Total capital`)
+summary(dev_data$`Total capital`)
+
+# `Reserves and funds`
+dev_data$`Reserves and funds`= treatOut(dev_data$`Reserves and funds`)
+summary(dev_data$`Reserves and funds`)
+
+# Borrowings
+dev_data$Borrowings= treatOut(dev_data$Borrowings)
+summary(dev_data$Borrowings)
+
+# `Current liabilities & provisions`
+dev_data$`Current liabilities & provisions`= treatOut(dev_data$`Current liabilities & provisions`)
+summary(dev_data$`Current liabilities & provisions`)
+
+# `Deferred tax liability`
+dev_data$`Deferred tax liability`= treatOut(dev_data$`Deferred tax liability`)
+summary(dev_data$`Deferred tax liability`)
+
+# `Shareholders funds`
+dev_data$`Shareholders funds`= treatOut(dev_data$`Shareholders funds`)
+summary(dev_data$`Shareholders funds`)
+
+# `Cumulative retained profits`
+dev_data$`Cumulative retained profits`= treatOut(dev_data$`Cumulative retained profits`)
+summary(dev_data$`Cumulative retained profits`)
+
+# `Capital employed`
+dev_data$`Capital employed`= treatOut(dev_data$`Capital employed`)
+summary(dev_data$`Capital employed`)
+
+# `TOL/TNW`
+dev_data$`TOL/TNW`= treatOut(dev_data$`TOL/TNW`)
+summary(dev_data$`TOL/TNW`)
+
+# `Total term liabilities / tangible net worth`
+dev_data$`Total term liabilities / tangible net worth`= treatOut(dev_data$`Total term liabilities / tangible net worth`)
+summary(dev_data$`Total term liabilities / tangible net worth`)
+
+# `Contingent liabilities / Net worth (%)`
+dev_data$`Contingent liabilities / Net worth (%)`= treatOut(dev_data$`Contingent liabilities / Net worth (%)`)
+summary(dev_data$`Contingent liabilities / Net worth (%)`)
+
+# `Contingent liabilities`
+dev_data$`Contingent liabilities`= treatOut(dev_data$`Contingent liabilities`)
+summary(dev_data$`Contingent liabilities`)
+
+# `Net fixed assets`
+dev_data$`Net fixed assets`= treatOut(dev_data$`Net fixed assets`)
+summary(dev_data$`Net fixed assets`)
+
+# Investments
+dev_data$Investments= treatOut(dev_data$Investments)
+summary(dev_data$Investments)
+
+# `Current assets`
+dev_data$`Current assets`= treatOut(dev_data$`Current assets`)
+summary(dev_data$`Current assets`)
+
+# `Net working capital`
+dev_data$`Net working capital`= treatOut(dev_data$`Net working capital`)
+summary(dev_data$`Net working capital`)
+
+# `Quick ratio (times)`
+dev_data$`Quick ratio (times)`= treatOut(dev_data$`Quick ratio (times)`)
+summary(dev_data$`Quick ratio (times)`)
+
+# `Current ratio (times)`
+dev_data$`Current ratio (times)`= treatOut(dev_data$`Current ratio (times)`)
+summary(dev_data$`Current ratio (times)`)
+
+# `Debt to equity ratio (times)`
+dev_data$`Debt to equity ratio (times)`= treatOut(dev_data$`Debt to equity ratio (times)`)
+summary(dev_data$`Debt to equity ratio (times)`)
+
+# `Cash to current liabilities (times)`
+dev_data$`Cash to current liabilities (times)`= treatOut(dev_data$`Cash to current liabilities (times)`)
+summary(dev_data$`Cash to current liabilities (times)`)
+
+# `Cash to average cost of sales per day`
+dev_data$`Cash to average cost of sales per day`= treatOut(dev_data$`Cash to average cost of sales per day`)
+summary(dev_data$`Cash to average cost of sales per day`)
+
+# `Creditors turnover`
+dev_data$`Creditors turnover`= treatOut(dev_data$`Creditors turnover`)
+summary(dev_data$`Creditors turnover`)
+
+# `Debtors turnover`
+dev_data$`Debtors turnover`= treatOut(dev_data$`Debtors turnover`)
+summary(dev_data$`Debtors turnover`)
+
+# `Finished goods turnover`
+dev_data$`Finished goods turnover`= treatOut(dev_data$`Finished goods turnover`)
+summary(dev_data$`Finished goods turnover`)
+
+# `WIP turnover`
+dev_data$`WIP turnover`= treatOut(dev_data$`WIP turnover`)
+summary(dev_data$`WIP turnover`)
+
+# `Raw material turnover`
+dev_data$`Raw material turnover`= treatOut(dev_data$`Raw material turnover`)
+summary(dev_data$`Raw material turnover`)
+
+# `Shares outstanding`
+dev_data$`Shares outstanding`= treatOut(dev_data$`Shares outstanding`)
+summary(dev_data$`Shares outstanding`)
+
+# `Equity face value`
+dev_data$`Equity face value`= treatOut(dev_data$`Equity face value`)
+summary(dev_data$`Equity face value`)
+
+# EPS
+dev_data$EPS= treatOut(dev_data$EPS)
+summary(dev_data$EPS)
+
+# `Adjusted EPS`
+dev_data$`Adjusted EPS`= treatOut(dev_data$`Adjusted EPS`)
+summary(dev_data$`Adjusted EPS`)
+
+# `Total liabilities`
+dev_data$`Total liabilities`= treatOut(dev_data$`Total liabilities`)
+summary(dev_data$`Total liabilities`)
+
+# `PE on BSE`
+dev_data$`PE on BSE`= treatOut(dev_data$`PE on BSE`)
+summary(dev_data$`PE on BSE`)
+
+# All the variables seem to be within range, with no outliers
+# The next step will be to treat the NAs
+
+```
+
+```{r}
+
+# TREATING NA VALUES:
+# REMOVING NA / TREATMENT BY MEAN OR MEDIAN:
+# DUPLICATING DATAFRAME:
+
+NArem = dev_data
+
+# 1. Let us first try removing them:
+
+library(mice)
+md.pattern(NArem)
+# This shows that there are too many NA values in the data
+
+# Let us remove and take the proportion of NA
+dev_dataNA = na.omit(NArem)
+dim(NArem)
+
+# 539/3531 = 0.152648
+# when we remove NA values, we only have 15% data remaining.
+# This means we will definitely have to impute values
+
+# 2. IMPUTING WITH MEAN VALUE IN dev_data:
+
+library(Hmisc)
+library(DMwR)
+
+# Total Income:
+
+dev_data$`Total income`[is.na(dev_data$`Total income`)] = mean(dev_data$`Total income`, na.rm = T)
+# View(dev_data$`Total income`)
+
+anyNA(dev_data$`Total income`)
+# NA - FALSE (Meaning that there are no na values present now)
+# Let us do the same for the other variables
+
+# Change in stock
+dev_data$`Change in stock`[is.na(dev_data$`Change in stock`)] = mean(dev_data$`Change in stock`, na.rm = T)
+# View(dev_data$`Change in stock`)
+
+# Total expenses
+dev_data$`Total expenses`[is.na(dev_data$`Total expenses`)] = mean(dev_data$`Total expenses`, na.rm = T)
+# View(dev_data$`Total expenses`)
+
+# Profit after tax
+dev_data$`Profit after tax`[is.na(dev_data$`Profit after tax`)] = mean(dev_data$`Profit after tax`, na.rm = T)
+# View(dev_data$`Profit after tax`)
+
+# PBDITA
+dev_data$PBDITA[is.na(dev_data$PBDITA)] = mean(dev_data$PBDITA, na.rm = T)
+# View(dev_data$PBDITA)
+
+# PBT
+dev_data$PBT[is.na(dev_data$PBT)] = mean(dev_data$PBT, na.rm = T)
+# View(dev_data$PBT)
+
+# Cash profit
+dev_data$`Cash profit`[is.na(dev_data$`Cash profit`)] = mean(dev_data$`Cash profit`, na.rm = T)
+# View(dev_data$`Cash profit`)
+
+# PBDITA as % of total income
+dev_data$`PBDITA as % of total income`[is.na(dev_data$`PBDITA as % of total income`)] = 
+  mean(dev_data$`PBDITA as % of total income`, na.rm = T)
+# View(dev_data$`PBDITA as % of total income`)
+
+# PBT as % of total income 
+dev_data$`PBT as % of total income`[is.na(dev_data$`PBT as % of total income`)] = 
+  mean(dev_data$`PBT as % of total income`, na.rm = T)
+# View(dev_data$`PBT as % of total income`)
+
+# PAT as % of total income
+dev_data$`PAT as % of total income`[is.na(dev_data$`PAT as % of total income`)] = 
+  mean(dev_data$`PAT as % of total income`, na.rm = T)
+# View(dev_data$`PAT as % of total income`)
+
+# Cash profit as % of total income
+dev_data$`Cash profit as % of total income`[is.na(dev_data$`Cash profit as % of total income`)] = mean(dev_data$`Cash profit as % of total income`, na.rm = T)
+# View(dev_data$`Cash profit as % of total income`)
+
+# PAT as % of net worth
+dev_data$`PAT as % of net worth`[is.na(dev_data$`PAT as % of net worth`)] = mean(dev_data$`PAT as % of net worth`, na.rm = T)
+# View(dev_data$`PAT as % of net worth`)
+
+# Sales
+dev_data$Sales[is.na(dev_data$Sales)] = mean(dev_data$Sales, na.rm = T)
+# View(dev_data$Sales)
+
+# Other income
+dev_data$`Other income`[is.na(dev_data$`Other income`)] = mean(dev_data$`Other income`, na.rm = T)
+# View(dev_data$`Other income`)
+
+# Total capital
+dev_data$`Total capital`[is.na(dev_data$`Total capital`)] = mean(dev_data$`Total capital`, na.rm = T)
+# View(dev_data$`Total capital`)
+
+# Reserves and funds
+dev_data$`Reserves and funds`[is.na(dev_data$`Reserves and funds`)] = mean(dev_data$`Reserves and funds`, na.rm = T)
+# View(dev_data$`Reserves and funds`)
+
+# Borrowings
+dev_data$Borrowings[is.na(dev_data$Borrowings)] = mean(dev_data$Borrowings, na.rm = T)
+# View(dev_data$Borrowings)
+
+# Current liabilities & provisions
+dev_data$`Current liabilities & provisions`[is.na(dev_data$`Current liabilities & provisions`)] = mean(dev_data$`Current liabilities & provisions`, na.rm = T)
+# View(dev_data$`Current liabilities & provisions`)
+
+# Deferred tax liability
+dev_data$`Deferred tax liability`[is.na(dev_data$`Deferred tax liability`)] = mean(dev_data$`Deferred tax liability`, na.rm = T)
+# View(dev_data$`Deferred tax liability`)
+
+# Cumulative retained profits
+dev_data$`Cumulative retained profits`[is.na(dev_data$`Cumulative retained profits`)] = 
+  mean(dev_data$`Cumulative retained profits`, na.rm = T)
+# View(dev_data$`Cumulative retained profits`)
+
+# Contingent liabilities
+dev_data$`Contingent liabilities`[is.na(dev_data$`Contingent liabilities`)] = mean(dev_data$`Contingent liabilities`, na.rm = T)
+# View(dev_data$`Contingent liabilities`)
+
+# Net fixed assets
+dev_data$`Net fixed assets`[is.na(dev_data$`Net fixed assets`)] = mean(dev_data$`Net fixed assets`, na.rm = T)
+# View(dev_data$`Net fixed assets`)
+
+# Investments 
+dev_data$Investments[is.na(dev_data$Investments)] = mean(dev_data$Investments, na.rm = T)
+# View(dev_data$Investments)
+
+# Current assets
+dev_data$`Current assets`[is.na(dev_data$`Current assets`)] = mean(dev_data$`Current assets`, na.rm = T)
+# View(dev_data$`Current assets`)
+
+# Net working capital
+dev_data$`Net working capital`[is.na(dev_data$`Net working capital`)] = mean(dev_data$`Net working capital`, na.rm = T)
+# View(dev_data$`Net working capital`)
+
+# Quick ratio (times)
+dev_data$`Quick ratio (times)`[is.na(dev_data$`Quick ratio (times)`)] = mean(dev_data$`Quick ratio (times)`, na.rm = T)
+# View(dev_data$`Quick ratio (times)`)
+
+# Current ratio (times)
+dev_data$`Current ratio (times)`[is.na(dev_data$`Current ratio (times)`)] = mean(dev_data$`Current ratio (times)`, na.rm = T)
+# View(dev_data$`Current ratio (times)`)
+
+# Cash to current liabilities (times)
+dev_data$`Cash to current liabilities (times)`[is.na(dev_data$`Cash to current liabilities (times)`)] = mean(dev_data$`Cash to current liabilities (times)`, na.rm = T)
+# View(dev_data$`Cash to current liabilities (times)`)
+
+# Cash to average cost of sales per day
+dev_data$`Cash to average cost of sales per day`[is.na(dev_data$`Cash to average cost of sales per day`)] = mean(dev_data$`Cash to average cost of sales per day`, na.rm = T)
+# View(dev_data$`Cash to average cost of sales per day`)
+
+# Creditors turnover
+dev_data$`Creditors turnover`[is.na(dev_data$`Creditors turnover`)] = mean(dev_data$`Creditors turnover`, na.rm = T)
+# View(dev_data$`Creditors turnover`)
+
+# Debtors turnover
+dev_data$`Debtors turnover`[is.na(dev_data$`Debtors turnover`)] = mean(dev_data$`Debtors turnover`, na.rm = T)
+# View(dev_data$`Debtors turnover`)
+
+# Finished goods turnover
+dev_data$`Finished goods turnover`[is.na(dev_data$`Finished goods turnover`)] = mean(dev_data$`Finished goods turnover`, na.rm = T)
+# View(dev_data$`Finished goods turnover`)
+
+# WIP turnover
+dev_data$`WIP turnover`[is.na(dev_data$`WIP turnover`)] = mean(dev_data$`WIP turnover`, na.rm = T)
+# View(dev_data$`WIP turnover`)
+
+# Raw material turnover
+dev_data$`Raw material turnover`[is.na(dev_data$`Raw material turnover`)] = mean(dev_data$`Raw material turnover`, na.rm = T)
+# View(dev_data$`Raw material turnover`)
+
+#  Shares outstanding
+dev_data$`Shares outstanding`[is.na(dev_data$`Shares outstanding`)] = mean(dev_data$`Shares outstanding`, na.rm = T)
+# View(dev_data$`Shares outstanding`)
+
+# Equity face value
+dev_data$`Equity face value`[is.na(dev_data$`Equity face value`)] = mean(dev_data$`Equity face value`, na.rm = T)
+# View(dev_data$`Equity face value`)
+
+# PE on BSE
+dev_data$`PE on BSE`[is.na(dev_data$`PE on BSE`)] = mean(dev_data$`PE on BSE`, na.rm = T)
+# View(dev_data$`PE on BSE`)
+
+# Income from financial services
+dev_data$`Income from financial services`[is.na(dev_data$`Income from financial services`)] = mean(dev_data$`Income from financial services`, na.rm = T)
+# View(dev_data$`Income from financial services`)
+
+# Sum of NAs checked for the entire data:
+sum(is.na(dev_data))
+
+summary(dev_data)
+```
+
+```{r}
+
+# Checking for correlation:
+
+library(corrplot)
+
+# Let us remove the ratios in correlation:
+
+corrd = dev_data[, c(2:10, 16:26, 30:34, 39:50)]
+
+fracorr = corrplot(cor(corrd), method = "square", title = "Correlation Matrix", type = "upper")
+
+# We find that there are multiple variables correlating.
+# for example, we have total assets correlating with almost all the variables, some of them being net worth, total income, total liabilities, current assets, capital employed, shareholders fund, total expenses, etc..
+# Hence we have identified a strong presence of multicollinearity between the independent variables
+
+# Let us keep the entire data removing just the dependent variables:
+
+fracorr2 = corrplot(cor(dev_data[, c(-1, -51)]), method = "square", title = "Correlation Matrix", type = "upper")
+
+```
+
+
+```{r}
+
+# Removing multicollinearity:
+
+# building models:
+
+mod1 = glm(as.factor(Defc)~., data = dev_data[, c(-1, -49)], family = binomial)
+
+summary(mod1)
+# Only a few variables are significant
+# `PAT as % of net worth`, Income from financial services, Total capital, Cumulative retained profits, TOL/TNW, `Current ratio (times)`, `Debt to equity ratio (times)`, `Cash to current liabilities (times)
+
+mod2 = glm(as.factor(Defc)~`PAT as % of net worth`+`Income from financial services`+`Cumulative retained profits`+ `TOL/TNW` +`Current ratio (times)`+`Debt to equity ratio (times)`+`Cash to current liabilities (times)`+`PBT as % of total income`+`Total capital`, data = dev_data[, -1], family = binomial)
+
+summary(mod2)
+
+# Mod2 is more significant than mod1
+
+library(car)
+
+vif(mod2)
+
+# We find hat there are no extreme values.
+
+```
+
+# UNIVARIATE AND BIVARIATE ANALYSIS:
+
+```{r}
+
+# UNIVARIATE ANALYSIS:
+
+summary(dev_data)
+
+# As we have now eliminated the Outliers, we do not see extreme values in any of the variables.
+# We have also treated the NA values by imputation of mean values
+# We have found the presence of multicollinearity and treated the same
+# A lot of the variables have contributed towards the asset value of the companies
+# We have foudn the PAT as a % of net worth, current ratio and cash to current liabilities to be very significant variables in determining the number of defaults
+
+summary(dev_data$`PAT as % of net worth`[Defc==1])
+summary(dev_data$`PAT as % of net worth`[Defc==0])
+
+# Less PAT has resulted in many defaults, while more PAT has resulted in maximised profit
+
+# BIVARIATE:
+
+library(ggplot2)
+
+pl1 = ggplot(dev_data, aes(x = `Net worth`, y = `Total income`)) + geom_point(color = "brown") + 
+  stat_smooth(method ="lm", se = FALSE, color = "red")
+
+pl1
+# Btw net worth and total income. Good positive correlation and distribution of points except some extremes
+
+pl2 = ggplot(dev_data, aes(x = `Total assets`, y = `Total expenses`)) + geom_point(color = "aquamarine4") + 
+  stat_smooth(method ="lm", se = FALSE, color = "red")
+
+pl2
+
+# The same kind of distribution is seen here.
+# This is due to the conversion of many outliers to the maximum or minimum value. 
+
+pl3 = ggplot(dev_data, aes(x = `Net working capital`, y = `Finished goods turnover`)) + geom_point(color = "black") + stat_smooth(method ="lm", se = FALSE, color = "red")
+pl3
+# We see a sort of negtive correlation, which means that there has been a profit after the sales of goods
+
+pl4 = ggplot(dev_data, aes(x = `Creditors turnover`, y = `Debtors turnover`)) + geom_point(color = "purple") +
+  stat_smooth(method ="lm", se = FALSE, color = "red")
+
+pl4
+
+# This shows that the debtors turnover is a bit less than the creditors turnover.
+
+pl5 = ggplot(data = dev_data)+ geom_boxplot(aes(x = as.factor(Defc), 
+                                                 y = `Debt to equity ratio (times)`, 
+                                                 fill = as.factor(Defc)))
+pl5
+
+# A median of 1 0r below debt quity ratio is always good and we find it has not made any company to default
+# A higher value of median 1 and above (which results due to more debt than equity) has led o the default of companies
+
+pl6 = ggplot(data = dev_data)+ geom_boxplot(aes(x = as.factor(Defc), 
+                                                 y = `Current ratio (times)`, 
+                                                 fill = as.factor(Defc)))
+pl6
+
+# This plot also shows a very practical image of the defaulters.
+# A higher value of median 1 or more (meaning assets are more than liabilities) can save a company from defaulting than otherwise.
+
+pl7 = ggplot(dev_data, aes(x=`PAT as % of net worth`, fill=as.factor(Defc))) +
+  geom_density(alpha=0.4)
+
+pl7
+
+# This plot also describes that companies with a lower(<=0) PAT% are more on the default side and positive % is more on the non default side.
+
+
+```
+
+
+
+```{r}
+
+# Variable creation:
+
+# PROFITABILTY RATIO:
+
+ROA = (dev_data$`Profit after tax`)/(dev_data$`Total assets`)
+summary(ROA)
+
+# This measures the earning per rupee of asset invested in the company. The higher the value, the better the company status
+
+# LEVERAGE RATIO:
+
+Equity.rat = (dev_data$`Shareholders funds`)/(dev_data$`Capital employed`)
+summary(Equity.rat)
+boxplot(Equity.rat)
+
+# This gives the total owner contribution in the company.
+# A higher rate indicates a company's long term solvency position, if otherwise the company is at a higher risk of defaulting
+
+# LIQUIDITY RATIO:
+
+ConttoWCap = (dev_data$`Contingent liabilities`)/(dev_data$`Net working capital`)
+summary(ConttoWCap)
+boxplot(ConttoWCap)
+
+# This ratio helps to identify if the company is able to meet emergency liabilities
+# Higher the value, higher the chances of default.
+
+# COMPANY SIZE RATIO:
+
+SalestoTotCap = (dev_data$Sales)/(dev_data$`Total capital`)
+summary(SalestoTotCap)
+
+# This helps us to assign the position of the company if they are well to do or not
+# Higher the value, better is the posiion of the company
+
+# The profitability and Liquidity go hand-in-hand. If profit is more, the company can be more liquid and meet their neeeds effectively.
+# A company can then maximise their position by means of maximised profit, which would increase their leverage in the market
+
+boxplot(SalestoTotCap)
+
+```
+
+## Treating the Validation dataset as well:
+
+```{r}
+
+# CHECKING FOR OUTLIERS:
+
+library(car)
+
+modout = lm(`Default - 1`~., data = val_data)
+
+outlierTest(modout)
+# test shows obs 56,366 show extreme values, so we are removing them
+
+val_data = val_data[-c(56,366), ]
+
+## Changing the values for outliers using the same treatOut function:
+
+
+# Total Assets
+val_data$`Total assets`= treatOut(val_data$`Total assets`)
+summary(val_data$`Total assets`)
+
+# `Net worth`
+val_data$`Net worth`= treatOut(val_data$`Net worth`)
+summary(val_data$`Net worth`)
+
+# `Total income`
+val_data$`Total income`= treatOut(val_data$`Total income`)
+summary(val_data$`Total income`)
+
+# `Change in stock`
+val_data$`Change in stock`= treatOut(val_data$`Change in stock`)
+summary(val_data$`Change in stock`)
+
+# `Total expenses`
+val_data$`Total expenses`= treatOut(val_data$`Total expenses`)
+summary(val_data$`Total expenses`)
+
+# `Profit after tax`
+val_data$`Profit after tax`= treatOut(val_data$`Profit after tax`)
+summary(val_data$`Profit after tax`)
+
+# PBDITA
+val_data$PBDITA= treatOut(val_data$PBDITA)
+summary(val_data$PBDITA)
+
+# PBT
+val_data$PBT= treatOut(val_data$PBT)
+summary(val_data$PBT)
+
+# `Cash profit`
+val_data$`Cash profit`= treatOut(val_data$`Cash profit`)
+summary(val_data$`Cash profit`)
+
+# `PBDITA as % of total income`
+val_data$`PBDITA as % of total income`= treatOut(val_data$`PBDITA as % of total income`)
+summary(val_data$`PBDITA as % of total income`)
+
+# `PBT as % of total income`
+val_data$`PBT as % of total income`= treatOut(val_data$`PBT as % of total income`)
+summary(val_data$`PBT as % of total income`)
+
+# `PAT as % of total income`
+val_data$`PAT as % of total income`= treatOut(val_data$`PAT as % of total income`)
+summary(val_data$`PAT as % of total income`)
+
+# `Cash profit as % of total income`
+val_data$`Cash profit as % of total income`= treatOut(val_data$`Cash profit as % of total income`)
+summary(val_data$`Cash profit as % of total income`)
+
+# `PAT as % of net worth`
+val_data$`PAT as % of net worth`= treatOut(val_data$`PAT as % of net worth`)
+summary(val_data$`PAT as % of net worth`)
+
+# Sales
+val_data$Sales= treatOut(val_data$Sales)
+summary(val_data$Sales)
+
+# `Income from financial services`
+val_data$`Income from financial services`= treatOut(val_data$`Income from financial services`)
+summary(val_data$`Income from financial services`)
+
+# `Other income`
+val_data$`Other income`= treatOut(val_data$`Other income`)
+summary(val_data$`Other income`)
+
+# `Total capital`
+val_data$`Total capital`= treatOut(val_data$`Total capital`)
+summary(val_data$`Total capital`)
+
+# `Reserves and funds`
+val_data$`Reserves and funds`= treatOut(val_data$`Reserves and funds`)
+summary(val_data$`Reserves and funds`)
+
+# Borrowings
+val_data$Borrowings= treatOut(val_data$Borrowings)
+summary(val_data$Borrowings)
+
+# `Current liabilities & provisions`
+val_data$`Current liabilities & provisions`= treatOut(val_data$`Current liabilities & provisions`)
+summary(val_data$`Current liabilities & provisions`)
+
+# `Deferred tax liability`
+val_data$`Deferred tax liability`= treatOut(val_data$`Deferred tax liability`)
+summary(val_data$`Deferred tax liability`)
+
+# `Shareholders funds`
+val_data$`Shareholders funds`= treatOut(val_data$`Shareholders funds`)
+summary(val_data$`Shareholders funds`)
+
+# `Cumulative retained profits`
+val_data$`Cumulative retained profits`= treatOut(val_data$`Cumulative retained profits`)
+summary(val_data$`Cumulative retained profits`)
+
+# `Capital employed`
+val_data$`Capital employed`= treatOut(val_data$`Capital employed`)
+summary(val_data$`Capital employed`)
+
+# `TOL/TNW`
+val_data$`TOL/TNW`= treatOut(val_data$`TOL/TNW`)
+summary(val_data$`TOL/TNW`)
+
+# `Total term liabilities / tangible net worth`
+val_data$`Total term liabilities / tangible net worth`= treatOut(val_data$`Total term liabilities / tangible net worth`)
+summary(val_data$`Total term liabilities / tangible net worth`)
+
+# `Contingent liabilities / Net worth (%)`
+val_data$`Contingent liabilities / Net worth (%)`= treatOut(val_data$`Contingent liabilities / Net worth (%)`)
+summary(val_data$`Contingent liabilities / Net worth (%)`)
+
+# `Contingent liabilities`
+val_data$`Contingent liabilities`= treatOut(val_data$`Contingent liabilities`)
+summary(val_data$`Contingent liabilities`)
+
+# `Net fixed assets`
+val_data$`Net fixed assets`= treatOut(val_data$`Net fixed assets`)
+summary(val_data$`Net fixed assets`)
+
+# Investments
+val_data$Investments= treatOut(val_data$Investments)
+summary(val_data$Investments)
+
+# `Current assets`
+val_data$`Current assets`= treatOut(val_data$`Current assets`)
+summary(val_data$`Current assets`)
+
+# `Net working capital`
+val_data$`Net working capital`= treatOut(val_data$`Net working capital`)
+summary(val_data$`Net working capital`)
+
+# `Quick ratio (times)`
+val_data$`Quick ratio (times)`= treatOut(val_data$`Quick ratio (times)`)
+summary(val_data$`Quick ratio (times)`)
+
+# `Current ratio (times)`
+val_data$`Current ratio (times)`= treatOut(val_data$`Current ratio (times)`)
+summary(val_data$`Current ratio (times)`)
+
+# `Debt to equity ratio (times)`
+val_data$`Debt to equity ratio (times)`= treatOut(val_data$`Debt to equity ratio (times)`)
+summary(val_data$`Debt to equity ratio (times)`)
+
+# `Cash to current liabilities (times)`
+val_data$`Cash to current liabilities (times)`= treatOut(val_data$`Cash to current liabilities (times)`)
+summary(val_data$`Cash to current liabilities (times)`)
+
+# `Cash to average cost of sales per day`
+val_data$`Cash to average cost of sales per day`= treatOut(val_data$`Cash to average cost of sales per day`)
+summary(val_data$`Cash to average cost of sales per day`)
+
+# `Creditors turnover`
+val_data$`Creditors turnover`= treatOut(val_data$`Creditors turnover`)
+summary(val_data$`Creditors turnover`)
+
+# `Debtors turnover`
+val_data$`Debtors turnover`= treatOut(val_data$`Debtors turnover`)
+summary(val_data$`Debtors turnover`)
+
+# `Finished goods turnover`
+val_data$`Finished goods turnover`= treatOut(val_data$`Finished goods turnover`)
+summary(val_data$`Finished goods turnover`)
+
+# `WIP turnover`
+val_data$`WIP turnover`= treatOut(val_data$`WIP turnover`)
+summary(val_data$`WIP turnover`)
+
+# `Raw material turnover`
+val_data$`Raw material turnover`= treatOut(val_data$`Raw material turnover`)
+summary(val_data$`Raw material turnover`)
+
+# `Shares outstanding`
+val_data$`Shares outstanding`= treatOut(val_data$`Shares outstanding`)
+summary(val_data$`Shares outstanding`)
+
+# `Equity face value`
+val_data$`Equity face value`= treatOut(val_data$`Equity face value`)
+summary(val_data$`Equity face value`)
+
+# EPS
+val_data$EPS= treatOut(val_data$EPS)
+summary(val_data$EPS)
+
+# `Adjusted EPS`
+val_data$`Adjusted EPS`= treatOut(val_data$`Adjusted EPS`)
+summary(val_data$`Adjusted EPS`)
+
+# `Total liabilities`
+val_data$`Total liabilities`= treatOut(val_data$`Total liabilities`)
+summary(val_data$`Total liabilities`)
+
+# `PE on BSE`
+val_data$`PE on BSE`= treatOut(val_data$`PE on BSE`)
+summary(val_data$`PE on BSE`)
+
+# All the variables seem to be within range, with no outliers
+
+```
+
+
+```{r}
+
+# TREATING NAs:
+# IMPUTING WITH MEAN VALUE IN val_data:
+
+library(Hmisc)
+library(DMwR)
+
+# Total Income:
+
+val_data$`Total income`[is.na(val_data$`Total income`)] = mean(val_data$`Total income`, na.rm = T)
+# View(val_data$`Total income`)
+
+anyNA(val_data$`Total income`)
+# NA - FALSE (Meaning that there are no na values present now)
+# Let us do the same for the other variables
+
+# Change in stock
+val_data$`Change in stock`[is.na(val_data$`Change in stock`)] = mean(val_data$`Change in stock`, na.rm = T)
+# View(val_data$`Change in stock`)
+
+# Total expenses
+val_data$`Total expenses`[is.na(val_data$`Total expenses`)] = mean(val_data$`Total expenses`, na.rm = T)
+# View(val_data$`Total expenses`)
+
+# Profit after tax
+val_data$`Profit after tax`[is.na(val_data$`Profit after tax`)] = mean(val_data$`Profit after tax`, na.rm = T)
+# View(val_data$`Profit after tax`)
+
+# PBDITA
+val_data$PBDITA[is.na(val_data$PBDITA)] = mean(val_data$PBDITA, na.rm = T)
+# View(val_data$PBDITA)
+
+# PBT
+val_data$PBT[is.na(val_data$PBT)] = mean(val_data$PBT, na.rm = T)
+# View(val_data$PBT)
+
+# Cash profit
+val_data$`Cash profit`[is.na(val_data$`Cash profit`)] = mean(val_data$`Cash profit`, na.rm = T)
+# View(val_data$`Cash profit`)
+
+# PBDITA as % of total income
+val_data$`PBDITA as % of total income`[is.na(val_data$`PBDITA as % of total income`)] = 
+  mean(val_data$`PBDITA as % of total income`, na.rm = T)
+# View(val_data$`PBDITA as % of total income`)
+
+# PBT as % of total income 
+val_data$`PBT as % of total income`[is.na(val_data$`PBT as % of total income`)] = 
+  mean(val_data$`PBT as % of total income`, na.rm = T)
+# View(val_data$`PBT as % of total income`)
+
+# PAT as % of total income
+val_data$`PAT as % of total income`[is.na(val_data$`PAT as % of total income`)] = 
+  mean(val_data$`PAT as % of total income`, na.rm = T)
+# View(val_data$`PAT as % of total income`)
+
+# Cash profit as % of total income
+val_data$`Cash profit as % of total income`[is.na(val_data$`Cash profit as % of total income`)] = mean(val_data$`Cash profit as % of total income`, na.rm = T)
+# View(val_data$`Cash profit as % of total income`)
+
+# PAT as % of net worth
+val_data$`PAT as % of net worth`[is.na(val_data$`PAT as % of net worth`)] = mean(val_data$`PAT as % of net worth`, na.rm = T)
+# View(val_data$`PAT as % of net worth`)
+
+# Sales
+val_data$Sales[is.na(val_data$Sales)] = mean(val_data$Sales, na.rm = T)
+# View(val_data$Sales)
+
+# Other income
+val_data$`Other income`[is.na(val_data$`Other income`)] = mean(val_data$`Other income`, na.rm = T)
+# View(val_data$`Other income`)
+
+# Total capital
+val_data$`Total capital`[is.na(val_data$`Total capital`)] = mean(val_data$`Total capital`, na.rm = T)
+# View(val_data$`Total capital`)
+
+# Reserves and funds
+val_data$`Reserves and funds`[is.na(val_data$`Reserves and funds`)] = mean(val_data$`Reserves and funds`, na.rm = T)
+# View(val_data$`Reserves and funds`)
+
+# Borrowings
+val_data$Borrowings[is.na(val_data$Borrowings)] = mean(val_data$Borrowings, na.rm = T)
+# View(val_data$Borrowings)
+
+# Current liabilities & provisions
+val_data$`Current liabilities & provisions`[is.na(val_data$`Current liabilities & provisions`)] = mean(val_data$`Current liabilities & provisions`, na.rm = T)
+# View(val_data$`Current liabilities & provisions`)
+
+# Deferred tax liability
+val_data$`Deferred tax liability`[is.na(val_data$`Deferred tax liability`)] = mean(val_data$`Deferred tax liability`, na.rm = T)
+# View(val_data$`Deferred tax liability`)
+
+# Cumulative retained profits
+val_data$`Cumulative retained profits`[is.na(val_data$`Cumulative retained profits`)] = 
+  mean(val_data$`Cumulative retained profits`, na.rm = T)
+# View(val_data$`Cumulative retained profits`)
+
+# Contingent liabilities
+val_data$`Contingent liabilities`[is.na(val_data$`Contingent liabilities`)] = mean(val_data$`Contingent liabilities`, na.rm = T)
+# View(val_data$`Contingent liabilities`)
+
+# Net fixed assets
+val_data$`Net fixed assets`[is.na(val_data$`Net fixed assets`)] = mean(val_data$`Net fixed assets`, na.rm = T)
+# View(val_data$`Net fixed assets`)
+
+# Investments 
+val_data$Investments[is.na(val_data$Investments)] = mean(val_data$Investments, na.rm = T)
+# View(val_data$Investments)
+
+# Current assets
+val_data$`Current assets`[is.na(val_data$`Current assets`)] = mean(val_data$`Current assets`, na.rm = T)
+# View(val_data$`Current assets`)
+
+# Net working capital
+val_data$`Net working capital`[is.na(val_data$`Net working capital`)] = mean(val_data$`Net working capital`, na.rm = T)
+# View(val_data$`Net working capital`)
+
+# Quick ratio (times)
+val_data$`Quick ratio (times)`[is.na(val_data$`Quick ratio (times)`)] = mean(val_data$`Quick ratio (times)`, na.rm = T)
+# View(val_data$`Quick ratio (times)`)
+
+# Current ratio (times)
+val_data$`Current ratio (times)`[is.na(val_data$`Current ratio (times)`)] = mean(val_data$`Current ratio (times)`, na.rm = T)
+# View(val_data$`Current ratio (times)`)
+
+# Cash to current liabilities (times)
+val_data$`Cash to current liabilities (times)`[is.na(val_data$`Cash to current liabilities (times)`)] = mean(val_data$`Cash to current liabilities (times)`, na.rm = T)
+# View(val_data$`Cash to current liabilities (times)`)
+
+# Cash to average cost of sales per day
+val_data$`Cash to average cost of sales per day`[is.na(val_data$`Cash to average cost of sales per day`)] = mean(val_data$`Cash to average cost of sales per day`, na.rm = T)
+# View(val_data$`Cash to average cost of sales per day`)
+
+# Creditors turnover
+val_data$`Creditors turnover`[is.na(val_data$`Creditors turnover`)] = mean(val_data$`Creditors turnover`, na.rm = T)
+# View(val_data$`Creditors turnover`)
+
+# Debtors turnover
+val_data$`Debtors turnover`[is.na(val_data$`Debtors turnover`)] = mean(val_data$`Debtors turnover`, na.rm = T)
+# View(val_data$`Debtors turnover`)
+
+# Finished goods turnover
+val_data$`Finished goods turnover`[is.na(val_data$`Finished goods turnover`)] = mean(val_data$`Finished goods turnover`, na.rm = T)
+# View(val_data$`Finished goods turnover`)
+
+# WIP turnover
+val_data$`WIP turnover`[is.na(val_data$`WIP turnover`)] = mean(val_data$`WIP turnover`, na.rm = T)
+# View(val_data$`WIP turnover`)
+
+# Raw material turnover
+val_data$`Raw material turnover`[is.na(val_data$`Raw material turnover`)] = mean(val_data$`Raw material turnover`, na.rm = T)
+# View(val_data$`Raw material turnover`)
+
+#  Shares outstanding
+val_data$`Shares outstanding`[is.na(val_data$`Shares outstanding`)] = mean(val_data$`Shares outstanding`, na.rm = T)
+# View(val_data$`Shares outstanding`)
+
+# Equity face value
+val_data$`Equity face value`[is.na(val_data$`Equity face value`)] = mean(val_data$`Equity face value`, na.rm = T)
+# View(val_data$`Equity face value`)
+
+# PE on BSE
+val_data$`PE on BSE`[is.na(val_data$`PE on BSE`)] = mean(val_data$`PE on BSE`, na.rm = T)
+# View(val_data$`PE on BSE`)
+
+# Income from financial services
+val_data$`Income from financial services`[is.na(val_data$`Income from financial services`)] = mean(val_data$`Income from financial services`, na.rm = T)
+# View(val_data$`Income from financial services`)
+
+# Sum of NAs checked for the entire data:
+sum(is.na(val_data))
+
+```
+
+### MODELING:
+
+```{r}
+
+# LOGISTIC MODEL:
+# Model 1 (on profit ratio)
+# We found that PAT as a % of net worth to be very significant variable
+# Let us convert the default variable to factor for simplified process
+
+dev_data$Defc = as.factor(dev_data$Defc)
+
+nrow(Defc)
+
+summary(dev_data$Defc)
+
+loGmod1 = glm(Defc~`PAT as % of net worth`, family = binomial)
+summary(loGmod1)
+
+# We see that the model is very significant in terms of the P value which is <2e-16 
+# We find that the coefficient of PAT is negative, which explains a lower value has increased default chances
+# The standard error is about 0.002 which validates the model accuracy
+# Also the coefficient is 15.15 standard deviations away from 0
+
+# Model 2 (on liquidity ratio)
+
+loGmod2 = glm(Defc~`Debt to equity ratio (times)`, family = binomial)
+
+summary(loGmod2)
+# Model 2 on debt equity ratio looks significant too
+# The coefficient is on a positive side, meaning a larger value of DER may default the company
+# The std error is 0.008 which is quite less
+# Also the P value isvery significant, if not like the previous model
+# The coefficients are almost 8 std deviations away from 0, which is pretty good
+# But our first model is still very significant comparatively
+
+
+# Model 3 (on leverage ratio):
+# Total liabilities of the customer divided by Total net worth (TOL/TNW)
+
+loGmod3 = glm(Defc~`TOL/TNW`, family = binomial)
+
+summary(loGmod3)
+# Model 3 on (TOL/TNW) looks very significant indetermining the default status
+# The coefficient is on a positive side, meaning a larger value of TOL may default the company
+# The std error is 0.005 which is less
+# Also the P value is very significant like our first model (<2e-16)
+# The coefficients are almost 8.5 std deviations away from 0, which is pretty good
+# But our first model is still very significant comparatively as the std error and sd were very less and more respectively
+
+# MODEL 4: (comapny size ratio):
+
+loGmod4 = glm(Defc~Sales, family = binomial)
+
+summary(loGmod4)
+
+# Model 4 on Sales looks significant in determining the default status
+# The coefficient is on a negative side, meaning a lower value of Sales may default the company
+# The std error is 4.555e-05 which is very good
+# Also the P value of 0.004 is significant 
+# The coefficients are almost 3 std deviations away from 0 which is okay
+
+
+loGmod5 = glm(Defc~`PAT as % of net worth`+ `Debt to equity ratio (times)`+ `TOL/TNW`+ Sales, family = binomial)
+summary(loGmod5)
+
+# Let us remove the TOL/TNW as it does not seem to be of much significance here
+
+loGmod6 = glm(Defc~`PAT as % of net worth`+ `Debt to equity ratio (times)`+Sales, family = binomial)
+summary(loGmod6)
+
+# This is a significant model with PAT% and Debt equity ratio being very significant
+# Sales has a very less std error which is pretty good
+# A much lesser AIC score 1081.2
+
+```
+
+
+```{r}
+
+# Proportion of default:
+
+table(dev_data$Defc)
+prop.table(table(dev_data$Defc))
+
+barplot(prop.table(table(dev_data$Defc)),
+        main = "Default distribution")
+
+# Since our objective is to identify the number of defaults, we need more of defaulted companies
+
+table(val_data$`Default - 1`)
+prop.table(table(val_data$`Default - 1`))
+
+barplot(prop.table(table(val_data$`Default - 1`)),
+        main = "Default distribution")
+
+# Our validation set also contains similar count and percentage of defaulters.
+# Let us predict with the mod2 (created after removing multi collinearity) on this val data.
+
+```
+
+## Model prediction:
+
+```{r}
+
+# Prediction on test data:
+# Let us predict on the test with mod2 logistic model
+
+test.pred = predict(mod2, newdata = val_data, type = "response")
+table(val_data$`Default - 1`, test.pred>0.3)
+
+train.pred = predict(mod2, data = dev_data, type = "response")
+table(dev_data$Defc, train.pred>0.3)
+
+# View(test.pred)
+
+# Accuracy on test data:
+# 630/(630+30) = 0.9545455 -> Specificity
+# 40/(13+40) = 0.754717 -> Sensitivity
+# (630+40)/nrow(val_data) = 0.9396914 -> Overall Accuracy
+
+# Accuracy on train data:
+# 3189/(3189+99) = 0.9698905 -> Specificity
+# 139/(139+104) = 0.5720165 -> Sensitivity
+# (3189+139)/nrow(dev_data) = 0.9425092 -> Overall Accuracy
+
+# Our mod2 logistic model has predicted almost 630 non defaulters correctly an 40 defaulters correctly giving an overall accuracy of almost 94% on the test data
+# And predicted 3189 non defaulters and 139 defaulters correctly with overall accracy of 94%
+# Though the overall accuracy is good and the same for both, the prediction on the number of defaulers on the train set is lower of about only 57% whereas it was good on the test data (75% correct prediction)
+
+library(ROCR)
+rocr.pred = prediction(test.pred, val_data$`Default - 1`)
+
+# Area Under the Curve is calculated
+as.numeric(performance(rocr.pred, "auc")@y.values)
+
+# 95.6 percent of the time, the model has given correct predictions
+
+perf = performance(rocr.pred, "tpr", "fpr")
+plot(perf)
+
+# For this data, we can justify that the model has made very good predictions on this data, missing out just a few predictions and giving a 95% accuracy
+
+```
+
+```{r}
+
+## Deciles:
+
+library(StatMeasures)
+
+DEC = decile(test.pred, decreasing = TRUE)
+View(DEC)
+
+# GAIN TABLE AND LIFT CHART
+
+library(blorr)
+
+gainTab = blr_gains_table(mod2)
+
+blr_decile_lift_chart(gainTab, bar_color = "aquamarine4")
+
+
+library(gains)
+
+GainV = gains(val_data$`Default - 1`, test.pred, groups = 10)
+plot.gains(GainV)
+print.gains(GainV)
+
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+

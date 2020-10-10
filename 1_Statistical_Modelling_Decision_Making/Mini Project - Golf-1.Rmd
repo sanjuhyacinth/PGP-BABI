@@ -1,0 +1,367 @@
+---
+title: "Mini Project - Golf"
+author: "Sanju Hyacinth C"
+date: "3 May 2019"
+output:
+  word_document: 
+    fig_caption: yes
+    fig_height: 4
+    fig_width: 4.5
+    toc: yes
+    toc_depth: 5
+  pdf_document: default
+  html_document:
+    df_print: paged
+---
+
+
+\pagebreak
+
+
+# 1    Project Objective
+
+The objective of the report is to explore the cardio data set **("Golf")** in R and
+generate insights about the data set. This exploration report will consists of the following:
+
+* Importing the dataset in R 
+* Understanding the structure of dataset 
+* Graphical exploration
+* Descriptive statistics
+* Insights from the dataset
+
+
+# 2    Assumptions
+
+Management believes that Par's market share could be increased with the introduction of a cut-resistant, longer-lasting golf ball. The below are some assumptions made from the details provided. And we are to prove if these assumptions hold true so as to help Par Inc., on their argument 
+
+* The new ball coating is designed to resist cuts and provide a more durable ball. The tests with the coating have been promising. This states that the new golf ball is **performing well**
+
+* Par would like the new cut resistent ball to offer driving distances **comparable** to those of the current model golf ball. From this statement it is evident that Par would like the new cut resistent ball to show **some difference in driving distances when compared to the current model ball** It might either over perform or under perform, but cannot be equal to that of the driving distances offered by the current golf balls
+
+* The testing was performed with a **mechanical hitting machine** so that any difference between the mean distances for the two models could be attributed to a **difference in the design**.It is an unbiased testing with no interruption in the process of testing the samples
+
+
+
+# 3       Environmental data analysis
+
+## 3.1  Exploratory data analysis
+
+### 3.1.1 Install packages
+
+
+```{r}
+# install.packages("IPSUR")
+# install.packages("readxl")
+```
+
+### 3.1.2 Set working directory
+
+```{r}
+setwd("C:/Users/Sandy's XPS/Downloads/R downloads/GOLF")
+getwd()
+
+```
+
+### 3.1.3 Import and read data set
+```{r}
+library(readxl)
+golf = read_excel("Golf.xls")
+
+golf
+```
+
+##  3.2  Variable Identification with Inferences
+
+
+```{r}
+
+# Find out Total Number of Rows and Columns
+
+dim(golf)
+
+# Find out Names of the Columns (Features)
+
+names(golf)
+
+# Find out the brief statistical values
+
+summary(golf)
+
+#Inference: the mean and median are almost similar. hence there are not many outliers found 
+
+
+```
+
+```{r}
+
+# Find out Class of each Feature, along with internal structure
+
+str(golf)
+
+
+# Find the class of fields
+
+class(golf$Current)
+
+class(golf$New)
+
+
+# Find the first 10 and the last 10 entries of the dataset by using
+
+head(golf,10)
+
+
+tail(golf,10)
+
+```
+
+\pagebeak
+
+
+## 3.3  Univariate Analysis
+
+Univariate data analysis, as the name suggests, is a **single variable data analysis** that is used to examine a single variable or column of data and provides details on that. This can be discrete or continuous.
+
+
+```{r}
+summary(golf$Current)
+
+
+summary(golf$New)
+```
+
+
+Let us visualize the summary using boxplots and histograms.
+
+* Boxplots are useful in detecting any **outliers** in the dataset.
+
+* Histograms on the other hand, can provide the exact distribution or the **spread of data**
+
+
+```{r}
+
+boxplot(golf$Current, col = "yellow", main = "Boxplot of Current golf ball", horizontal = TRUE)
+
+# We find that there are no values that fall beyond the normalcy range.
+
+hist(golf$Current, col = "skyblue", main = "Histogram of Current Golf balls", xlab = "Driving distance")
+
+# We find that there is a fair distribution of balls upto the median distance, but the distriution tends to dip beyond 275
+
+plot(density(golf$Current), main = "Plot of Current golf ball")
+
+# Though there is a dip, the density distribution srt of shws a normaland equal distribution of datapoints with a peak between 265 - 275
+
+
+```
+
+```{r}
+
+# Let's plot for the new model
+
+boxplot(golf$New, col = "lightgreen", main = "Boxplot of New Model Golf balls", horizontal = TRUE)
+
+# The boxplot of New model golf balls show a dense population that hits the maximum in the range of 260 - 265, and the spread of datapoints beyond the median range of 265.
+
+hist(golf$New, col = "orange", main = "Histogram of New Golf balls", xlab = "Driving distances")
+
+# the most frequent distance lies between 260 and 265 which forms the peek and the rest are almost evenly distributed between the distances. We may find the figure to be slightly skewed to the right 
+
+plot(density(golf$New), main = "Distance spread")
+
+# The plot shows a peak at 265 and drops down to a peak at 275. Unlike the current golf ball, the new golf ball resulted in a slightly peaky plot
+
+```
+
+
+
+## 3.4    Hypothesis formulation
+
+
+In order to compare the two samples of current and new model golf balls, and for the fact that the deviation is unknown, we are using a **t-test**. Since two samples are used, it is a two sample t test
+
+We are using **independent two sample t test** as the results on the data are not given by the same golf balls
+
+### Note that, unpaired two-samples t-test can be used only under certain conditions:
+
+* when the two groups of samples (A and B), being compared, are normally distributed. This can be checked using **Shapiro-Wilk test**. And
+
+* when the variances of the two groups are equal. This can be checked using **F-test**
+
+
+```{r}
+
+# Find the stadard deviations of each column
+
+sd(golf$Current)
+
+sd(golf$New)
+
+
+# Find te variance of the two columns
+
+var(golf$Current)
+
+var(golf$New)
+
+# More the variance, less the consistency. The new model golf ball is infered to be less consistent
+
+```
+
+
+* Shapiro-Wilk normality test
+
+
+```{r}
+
+# The data is sufficiently large, and considered a normal distribution. Just to prove it, Shapiro-Wilk test of normality is used,for which the difference in value between the two columns is found
+
+#H0 = data is normal, H1 = data is not normal
+
+diff = golf$Current - golf$New
+diff
+
+# Perform the Shapiro-Wilk test of normality
+
+shapiro.test(diff)
+
+# whenever p > a (alpha, that is 0.05), we fail to reject H0
+# Hence from the p-value, the data is normal
+
+```
+
+
+* F-test - to check the equality of variance 
+
+
+```{r}
+
+# F test is a variance test
+
+# H0 -> vaiances are equal or ratio of variance = 1
+# H1 -> variances are not equal or ratio of variance != 1
+
+var.test(golf$Current, golf$New)
+
+# since p value > alpha, we do not reject null hypothesis. This means that the variances are equal
+
+```
+
+## 3.5   Hypothesis Testing
+
+
+### 3.5.1 Two sample T - Test 
+
+Since the above two conditions holds true, we can proceed with the test
+
+
+```{r}
+
+# level of significance = 0.05
+# n = 40
+# degrees of freedom df = 40 - 1 = 39
+
+# H0 -> m1 = m2
+# H1 -> m1 != m2
+
+# Since,Par wants the new model golf ball to offer driving distances comparable to those of the current-model golf ball
+
+# m1 -> mean of current model golf ball
+# m2 -> mean of new model golf ball
+
+
+```
+
+
+```{r}
+
+Golfttest = t.test(golf$Current, golf$New, conf.level = 0.95, var.equal = T)
+Golfttest
+
+# We have found that the p-value is greater than alpha (significance level).
+# Hence we have failed to reject the Null Hypothesis (H0) at 95% confidence level.
+
+# P-value = 0.1879
+# If we have to be 95% sure, we cannot reject he null hypothesis
+# 95% of the time, the datapoints fall within the range  -1.383958  6.933958
+
+1 - 0.1879
+
+# But with 81% confidence we can say that the new golf ball has significantly gone desired driving distances
+
+
+```
+
+
+### 3.5.2  Hypothesis Test Plotting 
+
+* Confidence level of 95
+
+
+```{r}
+
+library(IPSUR)
+
+Golfttest = t.test(golf$Current, golf$New, conf.level = 0.95, var.equal = T)
+Golfttest
+
+plot.htest(Golfttest)
+
+# Difference between the means = 2.775
+# If the mean difference had been more than 4.159 or -4.159, we would have rejected the null hypothesis and would have proved that the performance of new golf ball is different from that of the current golf ball
+# 
+
+```
+
+* Confidence level of 81
+
+
+```{r}
+
+# Wit 81% confidence level, we could have rejected the null hypothesis
+
+Golfttest1 = t.test(golf$Current, golf$New, conf.level = 0.81, var.equal = T)
+
+Golfttest1
+
+plot.htest(Golfttest1)
+```
+
+```{r}
+
+diffsd = sd(golf$New - golf$Current)
+diffsd
+
+power.t.test(n = 80, delta = 2.775, sd = diffsd, sig.level = 0.05, alternative = "two.sided")
+
+power = 0.2448617
+beta = 1-0.2448617
+beta = 0.7551383
+
+# It is found that the power of the test is weak as the value of beta is more. Hence a much larger sample will help reduce the error
+
+power.t.test(power = 0.75, delta = 2.775, sd = diffsd, sig.level = 0.05, alternative = "two.sided")
+
+# A sample of atleast 340 is required o increase the power of the test by 50%
+
+```
+
+
+## 4  Conclusion - Inferences
+
+It is found that the driving distance of the new golf ball is not significantly diferent from that of the current ball. Since te p-value is found to be **0.1879** which is greater than the significance level (a), we therefore **fail to reject the Null Hypothesis** which states the new golf balls are significantly not different from the current golf balls.
+
+
+## 5  Recommendation 
+
+Par Inc., would still require a longer testing time as the goal is to achieve a durable golf ball, with sufficiently **larger sample size** in order to increase the power of the test to a significant extent
+Also a longer testing time can season the ball which may also increase the driving distance to an extent
+
+
+
+
+
+
+
+
+

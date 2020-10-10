@@ -1,0 +1,649 @@
+---
+title: "Capstone Project - Coronary Heart Disease Study"
+author: "Sanju Hyacinth C"
+date: "29/12/2019"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+# PACKAGES REQUIRED:
+# install.packages("Hmisc")
+```
+
+```{r}
+
+## Data loading 
+
+setwd("D:/R Progms/CAPSTONE")
+getwd()
+
+heart.d = read.csv("Coronary_heart_risk_study.csv")
+#View(heart.d)
+
+head(heart.d)
+
+```
+
+```{r}
+
+## Data Structure and Summary
+
+str(heart.d)
+
+# Our target variable is binary, hence to be converted to factor
+# Our continuous numeric terms to be converted from chr to num
+# And the nominal terms from num to factor
+
+## Structure conversion:
+
+heart.d$male = as.factor(heart.d$male)
+heart.d$education = as.factor(heart.d$education)
+heart.d$currentSmoker = as.factor(heart.d$currentSmoker)
+heart.d$BPMeds = as.factor(heart.d$BPMeds)
+heart.d$prevalentStroke = as.factor(heart.d$prevalentStroke)
+heart.d$prevalentHyp = as.factor(heart.d$prevalentHyp)
+heart.d$diabetes = as.factor(heart.d$diabetes)
+heart.d$TenYearCHD = as.factor(heart.d$TenYearCHD)
+
+## Summary:
+
+summary(heart.d)
+
+# From observing the target variable, we find that close to 85% of the patients have been cleared of having a coronary heart risk in the next 10 years
+# More than 50% of the population is women, non current smokers and not under blood pressure medication
+
+## NA counts:
+
+anyNA(heart.d)
+
+# A total of 7 fields have NA values with heartrate having the least and glucose having the most
+# We will have to impute data for glucose values as it is very important
+# We can remove the NA values in heartrate and education as it will not be a significant data loss
+# 
+
+```
+
+```{r}
+
+# UNIVARIATE ANALYSIS:
+
+# Age:
+summary(heart.d$age)
+boxplot(heart.d$age, data = heart.d, col = "lightblue", main = "Age distribution")
+# No outliers. Well within the ranges
+
+# Cigerattes per day
+summary(heart.d$cigsPerDay)
+boxplot(heart.d$cigsPerDay, data = heart.d, col = "pink", main = "cigsPerDay distribution")
+# 2 outliers present
+
+# Total Cholesterol:
+summary(heart.d$totChol)
+boxplot(heart.d$totChol, data = heart.d, col = "aquamarine3", main = "Cholesterol distribution")
+
+# Systolic BP
+summary(heart.d$sysBP)
+boxplot(heart.d$sysBP, data = heart.d, col = "lemonchiffon", main = "Systolic BP distribution")
+
+# Diastolic BP
+summary(heart.d$diaBP)
+boxplot(heart.d$diaBP, data = heart.d, col = "violet", main = "Diastolic BP distribution")
+
+# Body Mass Index:
+summary(heart.d$BMI)
+boxplot(heart.d$BMI, data = heart.d, col = "orange", main = "BMI distribution")
+
+# Heart Rate:
+summary(heart.d$heartRate)
+boxplot(heart.d$heartRate, data = heart.d, col = "lightgreen", main = "Heart Rate distribution")
+
+# Glucose
+summary(heart.d$glucose)
+boxplot(heart.d$glucose, data = heart.d, col = "tomato", main = "Glucose distribution")
+
+table(heart.d$male, heart.d$TenYearCHD)
+
+table(heart.d$male, heart.d$currentSmoker)
+# Women: 2420, Men: 1820
+# Most women (1431 - 59%) are non-smokers while the others (989) are smokers.
+# Most of the men (1106 - 60%) are smokers while the others (714) are non-smokers.
+
+table(heart.d$male, heart.d$BPMeds)
+# Close to 95% of the women and 98% of the men do not take BP medication
+
+table(heart.d$male, heart.d$prevalentStroke)
+# Almost the entire patient population is free of having had prevalent Stroke
+
+table(heart.d$male, heart.d$prevalentHyp)
+# Almost 69% of the female popultion and male population have not suffered prevalent Hypertension
+
+## Histograms on ggplot2:
+library(ggplot2)
+
+agep1 = ggplot(data = heart.d) + geom_histogram(mapping = aes(x = heart.d$age, fill = heart.d$TenYearCHD))
+
+cigsp2 = ggplot(data = heart.d) + geom_histogram(mapping = aes(x = heart.d$cigsPerDay, fill = heart.d$TenYearCHD))
+
+sysp3 = ggplot(data = heart.d) + geom_histogram(mapping = aes(x = heart.d$sysBP, fill = heart.d$TenYearCHD))
+
+diap4 = ggplot(data = heart.d) + geom_histogram(mapping = aes(x = heart.d$diaBP, fill = heart.d$TenYearCHD))
+
+BMIp5 = ggplot(data = heart.d) + geom_histogram(mapping = aes(x = heart.d$BMI, fill = heart.d$TenYearCHD))
+
+heartRp6 = ggplot(data = heart.d) + geom_histogram(mapping = aes(x = heart.d$heartRate, fill = heart.d$TenYearCHD))
+
+glucp7 = ggplot(data = heart.d) + geom_histogram(mapping = aes(x = heart.d$glucose, fill = heart.d$TenYearCHD))
+
+totchop8 = ggplot(data = heart.d) + geom_histogram(mapping = aes(x = heart.d$totChol, fill = heart.d$TenYearCHD))
+
+# View charts
+agep1
+cigsp2
+sysp3
+diap4
+BMIp5
+heartRp6
+glucp7
+totchop8
+
+
+```
+
+## BIVARIATE ANALYSIS:
+
+```{r}
+
+library(ggplot2)
+
+# age and cholesterol
+agechol1 = ggplot(data = heart.d, aes(x = heart.d$age, 
+y = heart.d$totChol ,color = heart.d$TenYearCHD)) + geom_point()
+
+# SysBP and DiaBP
+sysdia2 = ggplot(data = heart.d, aes(x = heart.d$sysBP, 
+y = heart.d$diaBP ,color = heart.d$TenYearCHD)) + geom_point()
+
+# Cigs count and age
+Cigsage3 = ggplot(data = heart.d, aes(x = heart.d$cigsPerDay, 
+y = heart.d$age ,color = heart.d$TenYearCHD)) + geom_point()
+
+# Prevalent Hyp and Heart rate:
+HypHr4 = ggplot(data = heart.d)+ geom_boxplot(aes(x = heart.d$prevalentHyp, 
+                                                       y = heart.d$heartRate, 
+                                                       fill = heart.d$TenYearCHD))
+
+# Prevalent Hyp and Age
+HypHr4.2 = ggplot(data = heart.d)+ geom_boxplot(aes(x = heart.d$prevalentHyp, 
+                                                       y = heart.d$age, 
+                                                       fill = heart.d$TenYearCHD))
+
+# BP Meds and BMI
+BPMBMI5 = ggplot(data = heart.d)+ geom_boxplot(aes(x = heart.d$BPMeds, 
+                                                       y = heart.d$BMI, 
+                                                       fill = heart.d$TenYearCHD))
+
+
+agechol1
+sysdia2
+Cigsage3
+HypHr4
+HypHr4.2
+BPMBMI5
+
+```
+
+
+```{r}
+
+# Missing value treatment
+
+# MICE:
+library(mice)
+md.pattern(heart.d)
+
+# 1. REMOVING NA VALUES:
+dataforNA = heart.d
+dataforNA = na.omit(dataforNA)
+1-(3658/4240)
+# 86.27% data is only clean
+# 13.73% data is missing
+
+anyNA(dataforNA)
+
+```
+
+
+## CORRELATION:
+
+```{r}
+
+library(corrplot)
+
+heartcorr = corrplot(cor(dataforNA[, c(2,5, 10:15)]), method = "number", type = "lower", title = "Correlation Matrix", tl.cex = 0.8, tl.col = "dark blue")
+
+#Pairwise correlation
+
+library(ppcor)
+pcor(dataforNA[, c(2,5, 10:15)], method = "pearson")
+
+# The major correlation (78%) is between Systolic and Diastolic BP 
+# A minor correlation between SysBP and Age, and DiaBP and BMI.
+
+```
+
+
+```{r}
+
+# OUTLIERS TREATMENT:
+
+treatOut <- function(x) {
+  quant <- quantile(x, probs=c(.25, .75), na.rm = T)
+  cap <- quantile(x, probs=c(.05, .95), na.rm = T)
+  D <- 1.5 * IQR(x, na.rm = T)
+  x[ x < (quant[1] - D )] <- cap[1]
+  x[ x > (quant[2] + D) ] <- cap[2]
+  return(x)
+}
+
+# treating the outliers with the function above. It helps to replace the lower 25th percentile with the minimum value and the upper 75th percentile value with the maximum value.
+
+dataforNA$cigsPerDay= treatOut(dataforNA$cigsPerDay)
+summary(dataforNA$cigsPerDay)
+
+dataforNA$totChol= treatOut(dataforNA$totChol)
+summary(dataforNA$totChol)
+
+dataforNA$sysBP= treatOut(dataforNA$sysBP)
+summary(dataforNA$sysBP)
+
+dataforNA$diaBP= treatOut(dataforNA$diaBP)
+summary(dataforNA$diaBP)
+
+dataforNA$BMI= treatOut(dataforNA$BMI)
+summary(dataforNA$BMI)
+
+dataforNA$heartRate= treatOut(dataforNA$heartRate)
+summary(dataforNA$heartRate)
+
+dataforNA$glucose= treatOut(dataforNA$glucose)
+summary(dataforNA$glucose)
+
+# BOXPLOTS:
+
+
+# Cigerattes per day
+boxplot(dataforNA$cigsPerDay, data = dataforNA, col = "pink", main = "cigsPerDay distribution")
+# 2 outliers present
+
+# Total Cholesterol:
+boxplot(dataforNA$totChol, data = dataforNA, col = "aquamarine3", main = "Cholesterol distribution")
+
+# Systolic BP
+boxplot(dataforNA$sysBP, data = dataforNA, col = "lemonchiffon", main = "Systolic BP distribution")
+
+# Diastolic BP
+boxplot(dataforNA$diaBP, data = dataforNA, col = "violet", main = "Diastolic BP distribution")
+
+# Body Mass Index:
+boxplot(dataforNA$BMI, data = dataforNA, col = "orange", main = "BMI distribution")
+
+# Heart Rate:
+boxplot(dataforNA$heartRate, data = dataforNA, col = "lightgreen", main = "Heart Rate distribution")
+
+# Glucose
+boxplot(dataforNA$glucose, data = dataforNA, col = "tomato", main = "Glucose distribution")
+
+# Education and glucose:
+EdGluc6 = ggplot(data = dataforNA)+ geom_boxplot(aes(x = dataforNA$education, 
+                                                      y = dataforNA$totChol, 
+                                                      fill = dataforNA$TenYearCHD))
+EdGluc6
+
+```
+
+
+```{r}
+
+# We should make a change in the approach not to include or manipulate the NA values.
+# Pure data is available (about 88%). So let us go with the available data.
+# We should build a model with the manipulated values as well as the removed values.
+
+library(car)
+
+library(caTools)
+
+set.seed(248)
+samplNA = sample.split(dataforNA, SplitRatio = 0.75)
+wNAtrain = subset(dataforNA,samplNA == TRUE)
+wNAtest = subset(dataforNA, samplNA == FALSE)
+
+prop.table(table(wNAtest$TenYearCHD))
+prop.table(table(wNAtrain$TenYearCHD))
+
+
+mod1 = glm(TenYearCHD~. , data = wNAtrain, family = "binomial")
+summary(mod1)
+
+# Prediction on test data:
+# Let us predict on the test with mod1 logistic model
+
+test.predict1 = predict(mod1, newdata = wNAtest, type = "response")
+table(wNAtest$TenYearCHD, test.predict1>0.5)
+# overall accuracy - 84.81%
+# specificity - 98.46%
+# 5.2% sensitivity
+# 2103.5 -> AIC
+
+#    FALSE TRUE
+#  0   769  12
+#  1   127   7
+
+mod2 = glm(TenYearCHD~male+age+sysBP+cigsPerDay+prevalentStroke+diabetes, data = wNAtrain, family = "binomial")
+summary(mod2)
+
+test.predict2 = predict(mod2, newdata = wNAtest, type = "response")
+table(wNAtest$TenYearCHD, test.predict2>0.5)
+
+# Not a change in the model is seen. The values are just he same.
+# 2088.9 -> AIC
+
+```
+
+```{r}
+
+# doing smote
+
+library(DMwR)
+
+sm.train = subset(dataforNA, samplNA == TRUE)
+sm.test = subset(dataforNA, samplNA == FALSE)
+
+# on the NA set
+
+prop.table(table(sm.train$TenYearCHD))
+prop.table(table(sm.test$TenYearCHD))
+
+balanced.train = SMOTE(TenYearCHD~., sm.train, perc.over = 100, k = 5, perc.under = 400)
+table(balanced.train$TenYearCHD)
+prop.table(table(balanced.train$TenYearCHD))
+
+barplot(prop.table(table(balanced.train$TenYearCHD)))
+# we have like 66 to 33 percentage now
+
+```
+
+```{r}
+
+library(car)
+
+mod3 = glm(TenYearCHD~. , data = balanced.train, family = "binomial")
+summary(mod3)
+
+vif(mod3)
+
+# Prediction on test data:
+# Let us predict on the test with mod1 logistic model
+
+test.predict3 = predict(mod3, newdata = sm.test, type = "response")
+table(sm.test$TenYearCHD, test.predict3>0.3)
+
+# MOST SIGNIFICANT *** : age, male, BP meds, prevStroke, diabetes, sysBP
+# SIGNIFICANT * : current smoker, totchol, BMI, glucose
+
+mod4 = glm(TenYearCHD~age+male+BPMeds+prevalentStroke+sysBP+diabetes+currentSmoker, data = balanced.train, family = "binomial")
+summary(mod4)
+
+test.predict4 = predict(mod4, newdata = sm.test, type = "response")
+table(sm.test$TenYearCHD, test.predict4>0.3)
+
+#    FALSE TRUE
+# 0   563  218
+# 1    51   83
+
+# Spec -> 72.09
+# Sens -> 61.94
+# Over -> 70.60
+
+test.predict4.1 = predict(mod4, newdata = sm.test, type = "response")
+table(sm.test$TenYearCHD, test.predict4.1>0.4)
+
+```
+
+
+
+```{r}
+
+## NAIVE BAYES:
+library(e1071)
+library(caret)
+
+# doing on the omitted NA set:
+NB1 = naiveBayes(TenYearCHD~., data = balanced.train) 
+print(NB1)
+
+NB.pred1 = predict(NB1, sm.test, type = "class" )
+table(NB.pred1, sm.test$TenYearCHD, dnn = c("Prediction", "Actual"))
+
+# overall accuracy - 74.64%
+# specificity - 89.84%
+# sensitivity - 28.31%
+
+# this model where we have omitted for has given an approx 40% accuracy of finding risk bearers. 
+
+# The prediction of non risk bearers is good with the dataset that has NA removed (86.10%)
+
+# We have an overall accuracy of 80.84% with only 88% of the data being useful
+
+#           Actual
+# Prediction   0   1
+#         0  619  70
+#         1  162  64
+
+# only on the categorical variables:
+
+NB2 = naiveBayes(TenYearCHD~., data = balanced.train[,-c(2,3,5,10:15)]) 
+print(NB2)
+
+NB.pred2 = predict(NB2, sm.test, type = "class" )
+table(NB.pred2, sm.test$TenYearCHD, dnn = c("Prediction", "Actual"))
+
+#           Actual
+# Prediction   0   1
+#         0  738 114
+#         1  43  20
+
+# overall accuracy - 82.84%
+# specificity - 86.62%
+# sensitivity - 31.75%
+
+```
+
+
+```{r}
+
+# random forest:
+
+library(randomForest)
+
+RFmtry.val = floor(sqrt(ncol(balanced.train)))
+RFmtry.val
+
+
+# RF1
+RF.m1 = randomForest(TenYearCHD~.,data = balanced.train, 
+                     ntree = 2000, mtry = RFmtry.val, nodesize = 10, importance = TRUE)
+
+print(RF.m1)
+# We see an increased OOB rate, but the class error is lowered (39%).
+# We also are able to see a good rise in the prediction of the heart risk bearers.
+# Let us try to boost this model for a better result.
+
+# Confusion matrix:
+#     0   1 class.error
+# 0 1602  90  0.05319149
+# 1  334 512  0.39479905
+
+# overall -> 83.29%
+# spec -> 94.68%
+# sens -> 60.52%
+
+plot(RF.m1)
+
+
+importance(RF.m1)
+
+# from the importance values, we find that age seems to be the most important parameter to predict the risk bearers, followed by cigs per day, sysBP, BP meds
+
+# TUNING:
+
+t_RF.m1 = tuneRF(x=balanced.train[,-c(16)],y=balanced.train$TenYearCHD, mtrystart = 15, stepfactor= 1.5, 
+                 ntree= 1700 , improve = 0.0001, nodesize=10, trace=TRUE, plot=TRUE, doBest=TRUE, importance=TRUE)
+
+# tuned model shows the best value at 12, OOB error rate - 16.59%
+
+# REFINED MODEL: 2
+
+RF.m1 = randomForest(TenYearCHD~.,data = balanced.train, ntree = 1700, mtry = 12, nodesize = 10, importance = TRUE)
+
+print(RF.m1)
+
+# Confusion matrix:
+#     0   1 class.error
+# 0 1596  96  0.05673759
+# 1  324 522  0.38297872
+
+# overall -> 83.45%
+# spec -> 94.33%
+# sens -> 61.70%
+
+importance(RF.m1)
+
+balanced.train$RF.Pred = predict(RF.m1, data = balanced.train, type = "class")
+balanced.train$RF.Score = 1-predict(RF.m1, data = balanced.train, type = "prob")[,2]
+sm.test$RF.Pred = predict(RF.m1, newdata = sm.test, type = "class")
+sm.test$RF.Score = 1-predict(RF.m1, newdata = sm.test, type = "prob")[,2]
+
+t_devRF <- with(balanced.train,table(TenYearCHD,RF.Pred))
+t_devRF
+
+#           RF.Pred
+# TenYearCHD    0    1
+#         0  1597   95
+#         1   329  517
+
+# RF has made a good prediction - 61.11% CORRECT PREDICTION OF RISK BEARERS
+# Spec - 94.38%
+# Overall Acc - 83.29% 
+
+# MODEL PERFORMANCE MEASURES:
+library(InformationValue)
+library(ROCR)
+library(ineq)
+library(ROSE)
+
+# RF:
+
+#AUC
+
+auc.train = roc.curve(balanced.train$TenYearCHD, balanced.train$RF.Score)
+
+auc.test = roc.curve(sm.test$TenYearCHD, sm.test$RF.Score)
+
+# The AUC is a little over 60% as we can see, and is more than the random prediction.
+
+ineq(sm.test$RF.Score,"gini")
+
+# lower gini of 15.01% indicated higher equality or lower inequality in distribution of the risk factors. 
+
+```
+
+# Boosting
+
+  XGBoosting is tried here with only our numeric variables of the NA removed dataset.
+
+```{r}
+library(xgboost)
+
+# XGBoost works with matrices that contain all numeric variables
+# we also need to split the training data and label
+
+gd_features_train<-as.matrix(balanced.train[, c(2,5,10:15)])
+gd_label_train<-as.matrix(balanced.train[,16])
+gd_features_test<-as.matrix(sm.test[,c(2,5,10:15)])
+
+xgb.fit <- xgboost(
+  data = gd_features_train,
+  label = gd_label_train,
+  eta = 0.001,#this is like shrinkage in the previous algorithm
+  max_depth = 3,#Larger the depth, more complex the model; higher chances of overfitting. There is no standard                      value for max_depth. Larger data sets require deep trees to learn the rules from data.
+  min_child_weight = 3,#it blocks the potential feature interactions to prevent overfitting
+  nrounds = 1000,#controls the maximum number of iterations. For classification, it is similar to the number of                       trees to grow.
+  nfold = 5,
+  objective = "binary:logistic",  # for regression models
+  verbose = 0,               # silent,
+  early_stopping_rounds = 10 # stop if no improvement for 10 consecutive trees
+)
+
+#gd_features_test<-as.matrix(gd_features_test[,1:ncol(gd_features_test)-1])
+
+sm.test$xgb.pred.class <- predict(xgb.fit, gd_features_test)
+
+table(sm.test$TenYearCHD,sm.test$xgb.pred.class>0.3)
+#this model was definitely better
+#or simply the total correct of the minority class
+
+sum(sm.test$TenYearCHD==1 & sm.test$xgb.pred.class>=0.3)
+
+#     TRUE
+#  0  781
+#  1  134
+
+```
+
+```{r}
+
+#in this code chunk we will playing around with all the values untill we find the best fit
+#let's play with shrinkage, known as eta in xbg
+
+tp_xgb<-vector()
+lr <- c(0.001, 0.01, 0.1, 0.3, 0.5, 0.7, 1)
+md<-c(1,3,5,7,9,15)
+nr<-c(2, 50, 100, 1000, 10000)
+for (i in md) {
+  
+  xgb.fit1 <- xgboost(
+    data = gd_features_train,
+    label = gd_label_train,
+    eta = 0.2,
+    max_depth = 15,
+    nrounds = 10,
+    nfold = 5,
+    objective = "binary:logistic",  # for regression models
+    verbose = 1,               # silent,
+    early_stopping_rounds = 14 # stop if no improvement for 10 consecutive trees
+  )
+  
+  sm.test$xgb.pred.class <- predict(xgb.fit1, gd_features_test)
+  
+  tp_xgb<-cbind(tp_xgb,sum(sm.test$TenYearCHD==1 & sm.test$xgb.pred.class>=0.3))
+  #if your class=1 and our prediction=0.2, we are going to display it with the next line compare the same algorithm     for different values
+  
+}
+
+tp_xgb
+table(sm.test$TenYearCHD, sm.test$xgb.pred.class>=0.3)
+
+# here there is significant imporvement of the model compared to our logistic model
+# sensitivity is found to be 56.72%, spec 64.27%, overall 63.17% accurate
+
+# wNAtest = wNAtest[, -17]
+
+#    FALSE TRUE
+#  0   502  279
+#  1    58   76
+
+```

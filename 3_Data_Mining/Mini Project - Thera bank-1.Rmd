@@ -1,0 +1,701 @@
+---
+title: "Data Mining Project on Thera bank Loan acceptance campaign"
+author: "Sanju Hyacinth C"
+date: "19/07/2019"
+output: 
+  word_document: 
+    fig_caption: yes
+    toc: yes
+---
+
+DATA ANALYSIS
+
+```{r}
+#installing the packages required
+
+#install.packages("dplyr")
+#install.packages("caTools")
+#install.packages("cluster")
+#install.packages("factoextra")
+#install.packages("NbClust")
+#install.packages("ROSE")
+#install.packages("rpart")
+#install.packages("rpart.plot")
+#install.packages("rattle")
+#install.packages("randomForest")
+#install.packages("ROCR")
+#install.packages("ineq")
+#install.packages("InformationValue")
+
+```
+
+Read data
+
+```{r}
+
+setwd("D:/R Progms")
+getwd()
+
+bankdata = readxl::read_xlsx("Thera Bank_Personal_Loan_Modelling-dataset-1 (1).xlsx", sheet = 2)
+View(bankdata)
+bankdata
+
+head(bankdata)
+str(bankdata)
+summary(bankdata)
+
+```
+
+```{r}
+
+anyNA(bankdata)
+
+table(is.na(bankdata))
+
+#since lesser number of na values, we can remove those missing values
+
+bankdata = na.omit(bankdata)
+
+```
+
+```{r}
+#DATA CLEANING
+library("dplyr")
+
+bankdata = bankdata[,-c(1,5)]
+bankdata
+
+names(bankdata)
+
+bankdata$`Family members` = factor(bankdata$`Family members`)
+bankdata$Education = factor(bankdata$Education, labels = c("Undergrad", "Graduate", "Advanced/Professional"))
+bankdata$`Personal Loan` = factor(bankdata$`Personal Loan`, labels = c("No", "Yes"))
+bankdata$`Securities Account` = factor(bankdata$`Securities Account`, labels = c("No", "Yes"))
+bankdata$`CD Account` = factor(bankdata$`CD Account`, labels = c("No", "Yes"))
+bankdata$Online = factor(bankdata$Online, labels = c("No", "Yes"))
+bankdata$CreditCard = factor(bankdata$CreditCard, labels = c("No", "Yes"))
+
+str(bankdata)
+
+```
+
+EDA OF DATA - DATA VISUALISATION:
+
+```{r}
+#Exploratory data analysis
+
+library(ggplot2)
+
+p1 = ggplot(data = bankdata)+ geom_boxplot(aes(x = bankdata$Education, y = bankdata$`Income (in K/month)`, fill = bankdata$Education))
+p1
+
+# from p1 we find that the median income of the undergrads is higher than that of the other two categories
+
+p2 = ggplot(data = bankdata) + geom_histogram(mapping = aes(x = bankdata$`Age (in years)`), bins = 40, fill = "palegreen4", col = "yellow")
+p2
+
+# In p2, we find a few peaks of count in ages of 30, 39, 48 and 58. 
+
+p3 = ggplot(data = bankdata) + geom_histogram(mapping = aes(x = bankdata$`Income (in K/month)`, fill = bankdata$`Personal Loan`), position = "fill")
+p3
+
+# p3 is an interesting graph showing the people of the higher income level (50 - 200k) are the people who have accepted the oan in the last campaign.
+
+p4 = ggplot(data = bankdata, aes(x = bankdata$`Income (in K/month)`, 
+y = bankdata$CCAvg ,color = bankdata$`Personal Loan`)) + geom_point()
+p4
+
+# this graph shows there is a constant increase of amount spent on credit cards with an increase in income levels. This also shows that the higher income level people are the ones who have accepted the loan in the last campaign
+
+# with respect to income
+
+p5 = ggplot(data = bankdata)+ geom_boxplot(aes(x = bankdata$PersonalLoan, y = bankdata$CCAvg, fill = bankdata$PersonalLoan))
+p5
+
+p6 = ggplot(data = bankdata)+ geom_boxplot(aes(x = bankdata$PersonalLoan, y = bankdata$`Income (in K/month)`, fill = bankdata$PersonalLoan))
+
+p7 = ggplot(data = bankdata)+ geom_boxplot(aes(x = bankdata$`Securities Account`, y = bankdata$`Income (in K/month)`, fill = bankdata$`Securities Account`))
+p7
+
+p8 = ggplot(data = bankdata)+ geom_boxplot(aes(x = bankdata$`CD Account`, y = bankdata$`Income (in K/month)`, fill = bankdata$`CD Account`))
+
+p9 = ggplot(data = bankdata)+ geom_boxplot(aes(x = bankdata$Online, y = bankdata$`Income (in K/month)`, fill = bankdata$Online))
+
+p10 = ggplot(data = bankdata)+ geom_boxplot(aes(x = bankdata$CreditCard, y = bankdata$`Income (in K/month)`, fill = bankdata$CreditCard))
+
+p11 = ggplot(data = bankdata)+ geom_boxplot(aes(x = bankdata$`Family members`, y = bankdata$`Income (in K/month)`, fill = bankdata$`Family members`))
+
+```
+
+
+```{r}
+#IN ORDER TO STANDARDISE THE DATA FOR CLUSTERING, WE SCALE THE DATA AND COMPUTE THE DISTANCES
+
+tb.scaled = scale(bankdata[, c(1:3,5,7)])
+print(tb.scaled, digits = 3)
+
+tb_eucldist = dist(tb.scaled, method = "euclidean")
+round(as.matrix(tb_eucldist)[1:10,1:10],2)
+
+```
+
+
+```{r}
+res.hclust0 <- hclust(tb_eucldist, method = "average")
+plot(res.hclust0)
+
+plot(res.hclust0)
+rect.hclust(res.hclust0, k=10, border="blue")
+
+# using the ward.D2 for a clearer dendogram
+
+res.hclust1 <- hclust(tb_eucldist, method = "ward.D2")
+plot(res.hclust1)
+
+plot(res.hclust1)
+rect.hclust(res.hclust1, k=10, border="blue")
+
+```
+
+```{r}
+
+#ASSIGNING K = 25 and 
+bkclust = cutree(res.hclust1, k = 10)
+bankdata = cbind(bankdata, bkclust)
+head(bankdata)
+
+bkclust1 = subset(bankdata, bkclust==1)
+bkclust2 = subset(bankdata, bkclust==2)
+bkclust3 = subset(bankdata, bkclust==3)
+bkclust4 = subset(bankdata, bkclust==4)
+bkclust5 = subset(bankdata, bkclust==5)
+bkclust6 = subset(bankdata, bkclust==6)
+bkclust7 = subset(bankdata, bkclust==7)
+bkclust8 = subset(bankdata, bkclust==8)
+bkclust9 = subset(bankdata, bkclust==9)
+bkclust10 = subset(bankdata, bkclust==10)
+
+aggr = aggregate(bankdata[, c(1:3,5)], list(bankdata$bkclust), mean)
+View(aggr)
+
+```
+
+```{r}
+
+#ASSIGNING K = 4 and proceeding with clustering
+
+res.hclust2 <- hclust(tb_eucldist, method = "ward.D2")
+plot(res.hclust2)
+
+plot(res.hclust2)
+rect.hclust(res.hclust2, k=4, border="blue")
+
+bkclustA = cutree(res.hclust2, k = 4)
+bankdata1 = cbind(bankdata, bkclustA)
+bankdata1 = bankdata1[,c(-13)]
+View(bankdata1)
+
+#the four clusters
+
+bkclustA1 = subset(bankdata1, bkclustA==1)
+bkclustA2 = subset(bankdata1, bkclustA==2)
+bkclustA3 = subset(bankdata1, bkclustA==3)
+bkclustA4 = subset(bankdata1, bkclustA==4)
+
+dim(bkclustA1)
+dim(bkclustA2)
+dim(bkclustA3)
+dim(bkclustA4)
+
+#Profiling of customers
+
+aggrA1 = aggregate(bankdata1[, c(1:3,5)], list(bankdata1$bkclustA), mean)
+View(aggrA1)
+
+```
+
+
+INFERENCE FROM HIERARCHICAL CLUSTERING:
+
+From the aggrA1 we find that there is a correlation between the average values of income and the amount spent on credit cards monthly, and also between age of the person with their experience both in years. We find that both the categories are inversely proportional to each other.
+
+We are also aware that the increase in spending on credit cards and annual income of a person, has increased the chances of the person accepting the personal loan. We can confirm that the 4 categories of people whose income is more, probably spends some money on credit cards and also have accepted the loan in the last campaign.
+
+Hence we can predict that the people with more income will accept the personal loan offered to them.
+
+
+
+CLASSIFICATION ALGORITHM:
+
+
+```{r}
+#Classification Algorithm
+
+setwd("D:/R Progms")
+getwd()
+
+bdata = readxl::read_xlsx("Thera Bank_Personal_Loan_Modelling-dataset-1 (1).xlsx", sheet = 2)
+
+bdata = na.omit(bdata)
+
+View(bdata)
+
+bdata = bdata[, c(-1,-5)]
+
+bdata$`Family members` = factor(bdata$`Family members`)
+bdata$Education = factor(bdata$Education, labels = c("Undergrad", "Graduate", "Advanced/Professional"))
+bdata$`Personal Loan` = factor(bdata$`Personal Loan`, labels = c("No", "Yes"))
+bdata$`Securities Account` = factor(bdata$`Securities Account`, labels = c("No", "Yes"))
+bdata$Online = factor(bdata$Online, labels = c("No", "Yes"))
+bdata$CreditCard = factor(bdata$CreditCard, labels = c("No", "Yes"))
+bdata$`CD Account` = factor(bdata$`CD Account`,labels = c("No", "Yes")
+                            )
+library(dplyr)
+
+bdata = bdata %>%
+  rename(PersonalLoan = `Personal Loan`,
+         Age = `Age (in years)`,
+         Experience = `Experience (in years)`,
+         IncomePM = `Income (in K/month)`,
+         Family = `Family members`,
+         SecuritiesAcct = `Securities Account`,
+         CDAcct = `CD Account`
+         )
+
+View(bdata)
+
+```
+
+```{r}
+
+library(caTools)
+set.seed(2000)
+sample = sample.split(bdata,SplitRatio = 0.7)
+b_train = subset(bdata,sample == TRUE)
+b_test = subset(bdata, sample == FALSE)
+
+View(b_train)
+
+nrow(b_train)
+nrow(b_test)
+
+```
+
+
+The proportion of data is checked if it is the same for both the train and test data
+
+```{r}
+
+prop.table(table(b_train$PersonalLoan))
+prop.table(table(b_test$PersonalLoan))
+prop.table(table(bdata$PersonalLoan))
+
+#plotting to visualise
+
+barplot(prop.table(table(bdata$PersonalLoan)),
+        main = "Distribution of loan")
+
+```
+
+We find that the data is very unbalanced as, from the data, only 9% of the people have accepted the loan in the last campaign. Hence we will have to balance the imbalanced data to proceed with the classification model in order to avoid any biased result
+
+The data can be balanced by either by oversampling the minority class with replacement and undersampling the majority class without replacement
+
+For this, we use the ROSE (Random Over Sampling Examples) library that helps in generating artificial values for the dataset.
+
+
+
+```{r}
+
+library(ROSE)
+
+bdata.balcd = ROSE(formula = PersonalLoan ~ Age+Experience+IncomePM+Family +CCAvg+Education+Mortgage+SecuritiesAcct+CDAcct+Online+CreditCard , data = b_train, p = 0.5, seed = 1)$data
+
+table(bdata.balcd$PersonalLoan)
+prop.table(table(bdata.balcd$PersonalLoan))
+
+library(caTools)
+set.seed(2000)
+sample = sample.split(bdata.balcd,SplitRatio = 0.7)
+b_train = subset(bdata.balcd,sample == TRUE)
+b_test = subset(bdata.balcd, sample == FALSE)
+
+prop.table(table(b_train$PersonalLoan))
+prop.table(table(b_test$PersonalLoan))
+prop.table(table(bdata.balcd$PersonalLoan))
+
+barplot(prop.table(table(bdata.balcd$PersonalLoan)),
+        main = "Distribution of loan")
+
+```
+
+PRE - PRUNING STAGE:
+
+Setting control paramaters:
+
+Let us now set the control parameters for the data:
+
+```{r}
+library(rpart)
+
+b.ctrl = rpart.control(minsplit = 6, minbucket = 2, cp = 0, xval = 10)
+
+```
+
+As we have set the control paramater, let us ow run the CART model on the train dataset
+
+CART MODEL 1
+
+```{r}
+
+b_m1 = rpart(formula = PersonalLoan ~ Age+Experience+IncomePM+Family +CCAvg+Education+Mortgage+SecuritiesAcct+CDAcct+Online+CreditCard, data = b_train, method = "class", control = b.ctrl)
+
+library(rpart.plot)
+
+rpart.plot(b_m1)
+
+print(b_m1)
+  
+```
+
+INTERPRETATION OF THE DECISION TREE:
+
+As we are aware from the root node that the majority of the people, as much as 2214, have not accepted the loan. The split or branch out has first taken place in the income level, IncomePM less than 93.85772 has branched to one side, where the most commom result is NO as majority have a higher level of income (948 58 No (0.938818565 0.061181435) )
+
+We find the next branch IncomePM greater than equal to 93.85772 1266  251 Yes (0.198262243 0.801737757) where the income per month is more or equal to 93.86 with about 80 percent of the people fitting the condition.
+
+The next split is preceeded from IncomePM less than 93.85772 where the Average spending on credit cards (CCAvg) with more number of people not fitting the condition of spending less that 3000 (about 96 percent).
+We find a similarity here and can understand that the majority of the people have high incomes and spend more on their credit cards.
+
+And there is almost an equal number of people spending more than equal to the specified (>=3.295866) amount (about 55 percent saying yes and 44 percent with a no)
+
+We also find that our minsplit and minbucket condition is followed with no split occuring beyound the specified limit.
+
+Thus it is now time for our tree to be pruned.
+
+
+
+PRUNING OF THE TREE:
+
+```{r}
+
+printcp(b_m1)
+plotcp(b_m1)
+
+#To extract the least cpvalue
+
+b_m1$cptable
+b_m1$cptable[,"xerror"]
+min(b_m1$cptable[,"xerror"])
+
+cpbest = b_m1$cptable[which.min(b_m1$cptable[,"xerror"]), "CP"]
+cpbest
+
+#hence we need to prune the tree at CP = 0.002174588
+#PRUNING THE TREE ACCORDINGLY
+
+b_ptree = prune(tree = b_m1, cp = cpbest)
+print(b_ptree)
+rpart.plot(b_ptree)
+
+library(rattle)
+
+fancyRpartPlot(b_ptree)
+
+```
+
+
+```{r}
+
+summary(b_ptree)
+print(b_ptree$variable.importance)
+
+barplot(sort(b_ptree$variable.importance, decreasing = TRUE),main = "VARIABLE IMPORTANCE PLOT", col = c("orange","aquamarine4","tomato"))
+
+```
+
+As we had earlier predicted, income and credit card usage is most important factors for accepting the loan.
+
+```{r}
+#Scoring/Predicting the training and test dataset
+
+b_train$predict.class = predict(b_ptree, data = b_train, type="class")
+b_train$predict.score = predict(b_ptree, data = b_train)
+
+head(b_train)
+
+b_test$predict.class = predict(b_ptree, newdata = b_test, type="class")
+b_test$predict.score = predict(b_ptree, newdata = b_test)
+
+head(b_test)
+
+```
+
+MODEL PERFORMANCE OF CART:
+
+Confusion matrix:
+
+```{r}
+
+b.dev = with(b_train,table(PersonalLoan,predict.class))
+b.dev
+
+b.test = with(b_test,table(PersonalLoan,predict.class))
+b.test
+
+```
+
+Accuracy:
+
+```{r}
+
+accu.dev = (b.dev[1,1]+b.dev[2,2])/(b.dev[1,1]+b.dev[1,2]+b.dev[2,1]+b.dev[2,2])
+
+accu.test = (b.test[1,1]+b.test[2,2])/(b.test[1,1]+b.test[1,2]+b.test[2,1]+b.test[2,2])
+
+accu.dev
+accu.test
+
+```
+
+
+INFERENCE OF MODEL PERFORMANCE:
+
+We find that the accuracy of the train and test data is almost similar, providing an accuracy of about 95 percent. Hence, we can conclude that this is a robust performance measure
+
+
+RANDOM FOREST ON THE DATASET:
+
+
+
+```{r}
+setwd("D:/R Progms")
+getwd()
+
+t.dataRF = readxl::read_xlsx("Thera Bank_Personal_Loan_Modelling-dataset-1 (1).xlsx", sheet = 2)
+
+t.dataRF = na.omit(t.dataRF)
+
+View(t.dataRF)
+
+t.dataRF = t.dataRF[, c(-1,-5)]
+
+t.dataRF$`Family members` = factor(t.dataRF$`Family members`)
+t.dataRF$Education = factor(t.dataRF$Education, labels = c("Undergrad", "Graduate", "Advanced/Professional"))
+t.dataRF$`Personal Loan` = factor(t.dataRF$`Personal Loan`, labels = c("No", "Yes"))
+t.dataRF$`Securities Account` = factor(t.dataRF$`Securities Account`, labels = c("No", "Yes"))
+t.dataRF$Online = factor(t.dataRF$Online, labels = c("No", "Yes"))
+t.dataRF$CreditCard = factor(t.dataRF$CreditCard, labels = c("No", "Yes"))
+t.dataRF$`CD Account` = factor(t.dataRF$`CD Account`,labels = c("No", "Yes")
+                            )
+library(dplyr)
+
+t.dataRF = t.dataRF %>%
+  rename(PersonalLoan = `Personal Loan`,
+         Age = `Age (in years)`,
+         Experience = `Experience (in years)`,
+         IncomePM = `Income (in K/month)`,
+         Family = `Family members`,
+         SecuritiesAcct = `Securities Account`,
+         CDAcct = `CD Account`
+         )
+
+View(t.dataRF)
+
+```
+```{r}
+library(caTools)
+set.seed(2000)
+sample = sample.split(t.dataRF,SplitRatio = 0.7)
+trainRF = subset(t.dataRF,sample == TRUE)
+testRF = subset(t.dataRF, sample == FALSE)
+nrow(trainRF)
+nrow(testRF)
+
+```
+
+```{r}
+
+prop.table(table(t.dataRF$PersonalLoan))
+prop.table(table(trainRF$PersonalLoan))
+prop.table(table(testRF$PersonalLoan))
+
+#distribution
+
+barplot(prop.table(table(t.dataRF$PersonalLoan)),
+        main = "Distribution of loan")
+```
+
+BALANCING THE IMBALANCED DATA - ROSE
+
+As the data is imbalanced, we are balancing the same with the ROSE package as we have done for the CART model.
+
+
+```{r}
+
+t.dataRF_balcd = ROSE(formula = PersonalLoan ~. , data = trainRF, p = 0.5, seed = 1)$data
+
+table(t.dataRF_balcd$PersonalLoan)
+
+prop.table(table(t.dataRF_balcd$PersonalLoan))
+
+barplot(prop.table(table(t.dataRF_balcd$PersonalLoan)),
+        main = "Balanced Distribution")
+
+```
+
+```{r}
+
+#splitting the balanced data into train and test data
+
+trainRF = subset(t.dataRF_balcd,sample == TRUE)
+testRF = subset(t.dataRF_balcd, sample == FALSE)
+nrow(trainRF)
+nrow(testRF)
+
+prop.table(table(trainRF$PersonalLoan))
+prop.table(table(testRF$PersonalLoan))
+
+```
+
+
+RANDOM FOREST MODEL:
+
+```{r}
+
+library(randomForest)
+
+set.seed(2500)
+
+#mtry value
+RFmtry.val = floor(sqrt(ncol(trainRF)))
+RFmtry.val
+
+#building the first random forest model
+
+RF.m1 = randomForest(PersonalLoan~.,data = trainRF, ntree = 1300, mtry = RFmtry.val ,nodesize = 10, importance = TRUE)
+
+#Print the model to see the OOB and error rate
+
+print(RF.m1)
+
+plot(RF.m1)
+
+importance(RF.m1)
+
+```
+
+Inference from the above model:
+
+We find that *Income per month* and *Education* are the two most important factors to predict the acceptance of personal loan by the people. 
+
+
+TUNING THE ALGORITHM:
+
+```{r}
+
+##Tune up the RF model to find out the best mtry
+
+set.seed(2500)
+
+t_RF.m1 = tuneRF(x=trainRF[,-c(8)],y=trainRF$PersonalLoan, mtrystart = 5, stepfactor=1.5, ntree= 830, improve = 0.0001, nodesize=10, trace=TRUE, plot=TRUE, doBest=TRUE, importance=TRUE)
+
+```
+
+Refined model:
+
+```{r}
+
+RF.m1 = randomForest(PersonalLoan~.,data = trainRF, ntree = 830, mtry = 3 ,nodesize = 10, importance = TRUE)
+
+##Print the model to see the OOB and error rate
+print(RF.m1)
+
+##Plot the RF to know the optimum number of trees
+plot(RF.m1)
+
+##Identify the importance of the variables
+importance(RF.m1)
+
+```
+
+
+Inference: Our Out Of Bag (OOB) Error rate has reduced slightly from 5.1 percent to 5.01 percent
+
+
+Using this tree, prediction is made for the train and the test data:
+
+```{r}
+
+trainRF$RF.Pred = predict(RF.m1, data = trainRF, type = "class")
+trainRF$RF.Score = 1-predict(RF.m1, data = trainRF, type = "prob")[,2]
+testRF$RF.Pred = predict(RF.m1, newdata = testRF, type = "class")
+testRF$RF.Score = 1-predict(RF.m1, newdata = testRF, type = "prob")[,2]
+
+```
+
+Confusion matrix:
+
+```{r}
+
+t_devRF <- with(trainRF,table(PersonalLoan,RF.Pred))
+t_devRF
+
+t_testRF <- with(testRF,table(PersonalLoan,RF.Pred))
+t_testRF
+
+```
+
+Accuracy measurement:
+
+```{r}
+
+accu.devRF = (t_devRF[1,1]+t_devRF[2,2])/(t_devRF[1,1]+t_devRF[1,2]+t_devRF[2,1]+t_devRF[2,2])
+
+accu.testRF = (t_testRF[1,1]+t_testRF[2,2])/(t_testRF[1,1]+t_testRF[1,2]+t_testRF[2,1]+t_testRF[2,2])
+
+accu.devRF
+accu.testRF
+
+```
+
+We infer from the Confusion matrix and Accuracy that both the train and test data set have performed well in the random forest technique as the CART model. But we cannot decide the performance of the model purely basis accuracy, especially for an imbalanced dataset.
+
+In order to measure the performace of the models, we need to run some MODEL PERFORMANCE MEASURES on the 
+
+
+MODEL PERFORMANCE MEASURES:
+
+
+```{r}
+
+library(ROCR)
+library(ineq)
+library(InformationValue)
+
+# RANDOM FOREST:
+
+#AUC
+auc.train = roc.curve(trainRF$PersonalLoan, trainRF$RF.Score)
+auc.test = roc.curve(testRF$PersonalLoan, testRF$RF.Score)
+
+#the model performance is very good as the curve is almost at 1 which relates to high accuracy in both the train as well as in the test models
+
+#gini
+
+ineq(trainRF$RF.Score,"gini")
+ineq(testRF$RF.Score,"gini")
+
+
+```
+
+
+
+
+
+
+
+
+
+
+

@@ -1,0 +1,811 @@
+---
+title: "WSMA - Shark Tank Project"
+author: "Sanju Hyacinth C"
+date: "20/12/2019"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+# 1. Problem Statement:
+
+  We are provided with a dataset of Shark Tank episodes containing 495 entrepreneurs making their pitch to the VC sharks. Initially we are asked to only use the description for **text mining** with deal as the dependent variable and develop prediction models. Later we are asked to include a new column "Ratio" calculated by dividing asked for by valuation.
+  
+# 2. Packages Required:
+
+```{r}
+
+# install.packages('tm')
+# install.packages('SnowballC')(
+# install.packages('ggplot2')
+# install.packages('RColorBrewer')
+# install.packages('wordcloud')
+# install.packages('topicmodels')
+# install.packages('data.table')
+# install.packages('stringi')
+# install.packages('dplyr')
+# install.packages('syuzhet')
+# install.packages('plyr')
+# install.packages('grid')
+# install.packages('caTools')
+#install.packages("rpart")
+#install.packages("rpart.plot")
+#install.packages("rattle")
+#install.packages("ROCR")
+# install.packages('randomForest')
+
+library(wordcloud)
+library(RColorBrewer)
+library(topicmodels)
+library(data.table)
+library(syuzhet)
+library(grid)
+library(plyr)
+library(caTools)
+library(rpart)
+library(rpart.plot)
+library(ROCR)
+library(rattle)
+library(randomForest)
+
+```
+
+# 3. Data Exploration:
+
+```{r}
+
+# Data loading:
+
+setwd("D:/R Progms")
+
+shark.df = read.csv("Dataset (1).csv")
+View(shark.df)
+
+# Converting to correct data types:
+
+shark.df$description = as.character(shark.df$description)
+shark.df$deal = ifelse(shark.df$deal=="TRUE",1,0)
+shark.df$deal = as.factor(shark.df$deal)
+
+```
+
+### Data Exploration:
+
+```{r}
+
+# Structure Exploration:
+
+str(shark.df)
+
+# Summary of data:
+
+summary(shark.df)
+
+## Out of the 495 deals, 251 were accepted by the VC Sharks
+## Speciality food is the category that is most pitched
+## A large number of entrepreneurs from Los Angeles, CA
+## The minimum and maximum asked for value are 10000 and 5000000  
+## The minimum and maximum valuation are 40000 and 30000000
+
+```
+
+# 4. Data cleaning - Refining text
+
+## 4.1 Step 1 
+
+## 4.1.1 Corpus Creation:
+
+```{r}
+# Corpus creation
+
+library(tm)
+library(SnowballC)
+
+sCorpus = Corpus(VectorSource(shark.df$description))
+
+```
+
+### Converting the corpus to lowercase:
+
+```{r}
+
+library(stringi)
+sCorpus = tm_map(sCorpus, content_transformer(stri_trans_tolower))
+
+## Result
+writeLines(strwrap(sCorpus[[22]]$content, 100))
+
+```
+
+### Removing Punctuation in the text:
+
+```{r}
+
+## Removing punctuation
+sCorpus = tm_map(sCorpus, removePunctuation)
+
+## Result
+writeLines(strwrap(sCorpus[[22]]$content, 100))
+
+```
+
+### Removing extra white spaces:
+
+```{r}
+
+## White space removal
+sCorpus = tm_map(sCorpus, stripWhitespace)
+
+## Result
+writeLines(strwrap(sCorpus[[22]]$content, 100))
+
+```
+
+### Remove Stopwords:
+
+```{r}
+
+## Adding more stop words
+moreStopwords = c((stopwords("english")), c("shark", "tank", "also", "can", "just", "use", "products", "made", "even", "makes"))
+
+## Removing stopwords
+sCorpus = tm_map(sCorpus, removeWords, moreStopwords)
+
+## Result
+writeLines(strwrap(sCorpus[[22]]$content, 100))
+
+```
+
+### Remove Numbers:
+
+```{r}
+
+## Remove numbers
+sCorpus = tm_map(sCorpus, removeNumbers)
+
+## Result
+writeLines(strwrap(sCorpus[[22]]$content, 100))
+
+```
+
+
+## 4.1.2 Creating a Document Text Matrix:
+
+```{r}
+
+## Document Text Matrix
+dtm = DocumentTermMatrix(sCorpus)
+dtm
+
+## Removing the least occuring terms (sparse terms) from the text
+## Cleaning the data upto 99.7 %
+dtm = removeSparseTerms(dtm, 0.997)
+dtm                        
+
+## Converting to a data frame
+dataShark = as.data.frame(as.matrix(dtm))
+
+## Include the dependent column to the new data frame
+dataShark$deal = shark.df$deal
+
+## dtm contains documents: 495, terms: 1563
+
+```
+
+### Let us find some of the most frequent terms in the text data:
+
+```{r}
+
+## Minimum frequency of 10 times
+
+termfreq1 = findFreqTerms(dtm, lowfreq = 10)
+termfreq1
+
+## There are about 138 terms that appear at least 10 times in the text data
+## These words include plurals and some compound words that lack punctuation marks. 
+
+```
+
+```{r}
+
+## Minimum frequency of 25 times
+
+termfreq2 = findFreqTerms(dtm, lowfreq = 25)
+termfreq2
+
+## There are about 14 terms that appear at least 25 times in the text data
+## This tells that only about 10% of the earlier words have made it upto 25 times
+
+```
+
+
+```{r}
+
+## Reducing the minimum frequency to 30
+
+termfreq4 = findFreqTerms(dtm, lowfreq = 30)
+termfreq4
+
+## We have a few words that actually convey some meaning or an excerpt of the text
+## We get a general idea about the pitches relating to establishing a company either for product sales or an online service. 
+
+```
+
+### A Wordcloud visualisation is given below:
+
+```{r}
+
+#Creating Wordcloud
+
+palette = brewer.pal(8, "Dark2")
+wordcloud(sCorpus, min.freq = 3, max.words = 100, random.order = FALSE, color = palette, rot.per =0.2)
+
+## The words company, designed, make, like and so have appeared more times.
+## They do not convey much sentiments but the idea of establishing companies is evident.
+
+```
+
+## 4.1.3 Model Building : 
+
+  We use the Document Term Matrix that has been converted to a data frame for building our CART model and arrive at our CART model diagram. We will also calculate the accuracy.
+  
+```{r}
+
+## Converting to factor
+
+dataShark$deal = factor(dataShark$deal, levels = c(0,1))
+# head(dataShark)
+
+## Set the seed
+
+library(caTools)
+set.seed(123)
+
+## Spliting the data to training and testing set
+
+split = sample.split(dataShark$deal, SplitRatio = 0.8)
+train_set = subset(dataShark, split == TRUE)
+test_set = subset(dataShark, split == FALSE)
+
+```
+
+### 1. CART Model:
+
+```{r}
+
+## Setting Control Parameter:
+
+cart.ctrl = rpart.control(minsplit = 18, minbucket = 6, cp = 0, xval = 10)
+
+## Model Building:
+
+cart.m1 <- rpart(formula = deal~., data = train_set, method = "class", control = cart.ctrl)
+rpart.plot(cart.m1)
+
+print(cart.m1)
+
+```
+
+```{r}
+
+## Pruning the tree
+
+printcp(cart.m1)
+plotcp(cart.m1)  
+
+## Extracting the least cpvalue
+
+cart.m1$cptable
+cart.m1$cptable[,"xerror"]
+min(cart.m1$cptable[,"xerror"])
+
+## Our least CP value 0.8820513
+
+## Best CP to prune the tree accordingly
+
+cpbest = cart.m1$cptable[which.min(cart.m1$cptable[,"xerror"]), "CP"]
+cpbest
+
+## hence we need to prune the tree at CP = 0.005128205
+## PRUNING THE TREE ACCORDINGLY
+
+Pruntree = prune(tree = cart.m1, cp = cpbest)
+print(Pruntree)
+rpart.plot(Pruntree)
+
+library(rattle)
+
+fancyRpartPlot(Pruntree)
+
+```
+
+```{r}
+
+## Summary
+summary(Pruntree)
+print(Pruntree$variable.importance)
+
+barplot(sort(Pruntree$variable.importance, decreasing = TRUE),main = "VARIABLE IMPORTANCE PLOT", col = c("orange","aquamarine4","tomato"))
+
+## From the variable importance, some of the significant words in getting the deal are below
+## easier, traditional, children, flavor, strong, solution, cleaning, etc...
+
+```
+
+```{r}
+
+#Scoring/Predicting the training and test dataset
+
+train_set$predict.class = predict(Pruntree, data = train_set, type="class")
+train_set$predict.score = predict(Pruntree, data = train_set)
+
+#head(train_set)
+
+test_set$predict.class = predict(Pruntree, newdata = test_set, type="class")
+test_set$predict.score = predict(Pruntree, newdata = test_set)
+
+#head(b_test)
+
+```
+
+```{r}
+
+## Confusion matrix for CART model
+
+conf.tr = with(train_set,table(deal,predict.class))
+conf.tr
+
+conf.te = with(test_set,table(deal,predict.class))
+conf.te
+
+```
+
+```{r}
+##  Accuracy:
+
+accuracy.tr = (conf.tr[1,1]+conf.tr[2,2])/(conf.tr[1,1]+conf.tr[1,2]+conf.tr[2,1]+conf.tr[2,2])
+
+accuracy.te = (conf.te[1,1]+conf.te[2,2])/(conf.te[1,1]+conf.te[1,2]+conf.te[2,1]+conf.te[2,2])
+
+accuracy.tr
+accuracy.te
+
+## CART is not considered a great model as the accuracy is quite low (train = 67%, test = 52%)
+## Moreover, though the model has predicted the non deals better
+## It has a very large number of mis-predictions on the deals
+
+```
+
+### 2. Random Forest Model:
+
+```{r}
+
+# Data spliting
+library(caTools)
+
+# Setting seed
+set.seed(123)
+
+## Splitting to train and test
+split1 = sample.split(dataShark$deal, SplitRatio = 0.8)
+train_2 = subset(dataShark, split1 == TRUE)
+test_2 = subset(dataShark, split1 == FALSE)
+
+```
+
+### Model Building:
+
+```{r}
+
+## Fitting Random Forest Model:
+
+classifier = randomForest(x = train_2[-1563], y = train_2$deal, ntree = 5)
+
+# Predicting the Test set results 
+
+y_pred = predict(classifier, newdata = test_2[-1563])
+# y_pred
+
+```
+
+### Confusion Matrix and Accuracy Evaluation:
+
+```{r}
+
+# Making the Confusion Matrix
+
+cm_rf = with(test_2, table(deal, y_pred))
+cm_rf
+
+## We observe about 75% correct prediction of no deals
+## But the mispredictions on the number of deals is more, which makes it not a good working model.
+
+# Accuracy:
+
+accuracy.rf = (cm_rf[1,1]+cm_rf[2,2])/(cm_rf[1,1]+cm_rf[1,2]+cm_rf[2,1]+cm_rf[2,2])
+accuracy.rf
+
+## The random forest model gives an accuracy of 55.5% which is an average performance
+
+```
+
+### 3. Logistic Regression Model:
+
+```{r}
+
+## Using the same data split for the random forest model:
+
+# Data spliting
+# library(caTools)
+
+# Setting seed
+# set.seed(123)
+
+## Splitting to train and test
+# split1 = sample.split(dataShark$deal, SplitRatio = 0.8)
+# train_2 = subset(dataShark, split1 == TRUE)
+# test_2 = subset(dataShark, split1 == FALSE)
+
+```
+
+### Building a Logit Model:
+
+### Logistic Regression Model 1:
+
+```{r}
+
+## Logistic Regression Model 1:
+
+Logit1 = glm(formula = deal~., data = train_2, family = binomial)
+predLog1 = predict(Logit1, newdata = test_2, type = "response")
+
+cmLogit1 = table(test_2$deal, predLog1 > 0.3)
+cmLogit1
+
+## Accuracy:
+acc.log1 = (cmLogit1[1,1]+cmLogit1[2,2])/(cmLogit1[1,1]+cmLogit1[1,2]+cmLogit1[2,1]+cmLogit1[2,2])
+acc.log1
+
+## The accuracy here falls to 49.5% which is lower compared to the RF model
+
+```
+
+### Logistic Regression Model 2:
+
+```{r}
+
+# Tweaking up the threshold to 0.8 to review the change in accuracy
+
+## Logistic Regression Model 2:
+
+Logit2 = glm(formula = deal~., data = train_2, family = binomial)
+predLog2 = predict(Logit2, newdata = test_2, type = "response")
+
+cmLogit2 = table(test_2$deal, predLog2 > 0.9)
+cmLogit2
+
+## Accuracy:
+
+acc.log2 = (cmLogit2[1,1]+cmLogit2[2,2])/(cmLogit2[1,1]+cmLogit2[1,2]+cmLogit2[2,1]+cmLogit2[2,2])
+acc.log2
+
+# This has proved a 4 point increase in accuracy from 49.5%
+# This is not a great model for the given data, when compared to our random forest model
+
+```
+
+## 4.2 Step 2:
+
+```{r}
+# Data loading:
+
+# shark.df = read.csv("Dataset (1).csv")
+# View(shark.df)
+
+# Converting to correct data types:
+
+# shark.df$description = as.character(shark.df$description)
+# shark.df$deal = ifelse(shark.df$deal=="TRUE",1,0)
+# shark.df$deal = as.factor(shark.df$deal)
+
+```
+
+
+## 4.2.1 Creating a new variable called "Ratio"
+
+```{r}
+
+## Ratio column:
+shark.df$ratio = shark.df$askedFor/shark.df$valuation
+
+head(shark.df)
+
+```
+
+## 4.2.2 Including column to dataframe:
+
+```{r}
+
+## Checking our corpus if it is cleaned:
+writeLines(strwrap(sCorpus[[71]]$content, 100))
+
+## Document Text Matrix
+# dtm = DocumentTermMatrix(sCorpus)
+
+## Removing the least occuring terms (sparse terms) from the text
+## Cleaning the data upto 99.7 %
+# dtm = removeSparseTerms(dtm, 0.997)
+## dtm contains documents: 495, terms: 1562                       
+
+
+## Converting to a data frame
+dataShark2 = as.data.frame(as.matrix(dtm))
+
+## Include the dependent column to the new data frame
+dataShark2$deal = shark.df$deal
+dataShark2$ratio = shark.df$ratio
+
+## Now we have both the columns (deal and ratio) included to the data frame
+
+```
+
+## 4.2.3 Model Building:
+
+  Now we are building models on the data frame two which contains the new column **ratio** along with the dependent variable deal. Let us see what difference does this bring to the model and their accuracy. We will build a CART, Random Forest and a Logistic Regression model, and evaluate the accuracy.
+  
+```{r}
+
+## Converting to factor
+
+dataShark2$deal = factor(dataShark2$deal, levels = c(0,1))
+# head(dataShark)
+
+## Set the seed
+
+library(caTools)
+set.seed(123)
+
+## Spliting the data to training and testing set
+
+split3 = sample.split(dataShark2$deal, SplitRatio = 0.8)
+train_c2 = subset(dataShark2, split3 == TRUE)
+test_c2 = subset(dataShark2, split3 == FALSE)
+
+```
+
+### 1. CART model (New):
+
+```{r}
+
+## Setting Control Parameter:
+# cart.ctrl = rpart.control(minsplit = 18, minbucket = 6, cp = 0, xval = 10)
+
+## Model Building:
+
+cart.m2 <- rpart(formula = deal~., data = train_c2, method = "class", control = cart.ctrl)
+rpart.plot(cart.m2)
+
+print(cart.m2)
+
+```
+
+```{r}
+
+## Pruning the tree:
+printcp(cart.m2)
+plotcp(cart.m2)  
+
+## Extracting the least cpvalue
+cart.m2$cptable
+cart.m2$cptable[,"xerror"]
+min(cart.m2$cptable[,"xerror"])
+
+## Our least CP value 0.8923077
+
+## Best CP to prune the tree accordingly
+cpbest2 = cart.m2$cptable[which.min(cart.m2$cptable[,"xerror"]), "CP"]
+cpbest2
+
+## hence we need to prune the tree at CP = 0.00
+## PRUNING THE TREE ACCORDINGLY
+
+Pruntree2 = prune(tree = cart.m2, cp = cpbest2)
+print(Pruntree2)
+rpart.plot(Pruntree2)
+
+library(rattle)
+
+fancyRpartPlot(Pruntree2)
+```
+
+```{r}
+
+## Summary
+
+summary(Pruntree2)
+print(Pruntree2$variable.importance)
+
+barplot(sort(Pruntree$variable.importance, decreasing = TRUE),main = "VARIABLE IMPORTANCE PLOT", col = c("orange","aquamarine4","tomato"))
+
+## The words have changed from the previous model. 
+## The words easier, traditional, children, flavor remain with ratio as an addition
+
+```
+
+```{r}
+
+#Scoring/Predicting the training and test dataset
+
+train_c2$predict.class = predict(Pruntree2, data = train_c2, type="class")
+train_c2$predict.score = predict(Pruntree2, data = train_c2)
+
+#head(train_set)
+
+test_c2$predict.class = predict(Pruntree2, newdata = test_c2, type="class")
+test_c2$predict.score = predict(Pruntree2, newdata = test_c2)
+
+```
+
+### Confusion matrix and Accuracy:
+
+```{r}
+
+## Confusion matrix for CART model2
+
+conf.tr2 = with(train_c2,table(deal,predict.class))
+conf.tr2
+
+conf.te2 = with(test_c2,table(deal,predict.class))
+conf.te2
+
+## Accuracy
+
+accuracy.tr2 = (conf.tr2[1,1]+conf.tr2[2,2])/(conf.tr2[1,1]+conf.tr2[1,2]+conf.tr2[2,1]+conf.tr2[2,2])
+
+accuracy.te2 = (conf.te2[1,1]+conf.te2[2,2])/(conf.te2[1,1]+conf.te2[1,2]+conf.te2[2,1]+conf.te2[2,2])
+
+accuracy.tr2
+accuracy.te2
+
+## CART model 2 has brought in accuracies (train = 65%, test = 48%) a bit lower than our CART model 1
+## Even here, the model has predicted the non deals better than the deals.
+
+```
+
+### 2. Random Forest Model (New): 
+
+```{r}
+
+# Data Partitioning
+library(caTools)
+
+# Setting seed
+set.seed(123)
+
+## Splitting the dataShark2 dataset to train and test
+
+split4 = sample.split(dataShark2$deal, SplitRatio = 0.8)
+train_rf2 = subset(dataShark2, split4 == TRUE)
+test_rf2 = subset(dataShark2, split4 == FALSE)
+
+```
+
+### Model Building:
+
+```{r}
+
+## Fitting Random Forest Model:
+
+classifier2 = randomForest(x = train_rf2[-1563], y = train_rf2$deal, ntree = 5)
+
+# Predicting the Test set results 
+
+y_pred2 = predict(classifier2, newdata = test_rf2[-1563])
+# y_pred2
+
+```
+
+### Confusion Matrix and Accuracy Evaluation:
+
+```{r}
+
+# Making the Confusion Matrix
+
+cm_rf2 = with(test_rf2, table(deal, y_pred2))
+cm_rf2
+
+## We observe 27 correct predictions on no deals out of 49
+## Also the correct prediction of deals is 28 out of 50 
+## Though the accuracies are the same for both rf models, this is slightly better as we have more correct predictions of deal acceptance by the VCs
+
+# Accuracy:
+
+accuracy.rf2 = (cm_rf2[1,1]+cm_rf2[2,2])/(cm_rf2[1,1]+cm_rf2[1,2]+cm_rf2[2,1]+cm_rf2[2,2])
+accuracy.rf2
+
+## The random forest model gives an accuracy of 55.5% which is an average performance
+
+```
+
+### 3. Logistic Regression Model (New):
+
+```{r}
+## Using the same data split for the random forest model:
+
+# Data spliting
+# library(caTools)
+
+# Setting seed
+# set.seed(123)
+
+## Splitting to train and test
+# split4 = sample.split(dataShark2$deal, SplitRatio = 0.8)
+# train_rf2 = subset(dataShark2, split4 == TRUE)
+# test_rf2 = subset(dataShark2, split4 == FALSE)
+
+```
+
+### Building a Logit Model (New):
+
+### Logistic Regression Model 1:
+
+```{r}
+
+## Logistic Regression Model 1:
+
+Logitn1 = glm(formula = deal~., data = train_rf2, family = binomial)
+predLogn1 = predict(Logitn1, newdata = test_rf2, type = "response")
+
+cmLogitn1 = table(test_rf2$deal, predLogn1 > 0.3)
+cmLogitn1
+
+## Accuracy:
+acc.logn1 = (cmLogitn1[1,1]+cmLogitn1[2,2])/(cmLogitn1[1,1]+cmLogitn1[1,2]+cmLogitn1[2,1]+cmLogitn1[2,2])
+acc.logn1
+
+## The accuracy here is 50.5% which is lower compared to the RF model
+## When comparing to our earlier Logit model 1, it is 1% higher.  
+## The number of no deals have been predicted better than last logit model which was 23 and this model has predicted 27 correctly. But the number of deals correctly predicted has come down to 23
+
+```
+
+### Logistic Regression Model 2 (New):
+
+```{r}
+
+# Tweaking up the threshold to 0.9 to review any change in accuracy
+
+## Logistic Regression Model 2:
+
+Logitn2 = glm(formula = deal~., data = train_rf2, family = binomial)
+predLogn2 = predict(Logitn2, newdata = test_rf2, type = "response")
+
+cmLogitn2 = table(test_rf2$deal, predLogn2 > 0.9)
+cmLogitn2
+
+## Accuracy:
+
+acc.logn2 = (cmLogitn2[1,1]+cmLogitn2[2,2])/(cmLogitn2[1,1]+cmLogitn2[1,2]+cmLogitn2[2,1]+cmLogitn2[2,2])
+acc.logn2
+
+## We find there is no increase in the accuracy or the prediction scores even after the tweak
+## Our similar model logit2 had a 4 point increase in accuracy to 53%
+
+```
+
+## Interpretation of the Models:
+
+  The data provided was that of the pitches made to the VC sharks on the Shark Tank show. We were asked to use only the description part for text mining. The insights from the text (after cleanup) gave an idea about what the contestants wanted (Some words like company, product, design, etc were some of the highly targeted words or frequent words from the text). We then developed some models (namely CART, Random Forest and Logistic Regression) based on the text data with **deal** as the dependent variable. And have recorded the results. Later, we were asked to include another column **ratio** formulated by the division of **askedFor** from **valuation**. Then we build another set of models with ration included as one of the independent variables in predicting the acceptance or rejection of deals.
+  
+  **CART MODEL (OLD VS NEW)**: The first model built with the data was the CART model. The control parameter was the same for botht he models (with and without the ratio column). The first model, with both the train and test data, was efficientin predicting the number of non deals. But it failed to correctly predict the number of deals that were accepted. The accuracy of train and test data was 66% and 52%. The new model (with ratio) actually **under performed** when compared to the one without ratio. This resulted in a decrease in the number of correct predictions of both the deals and non deals rate. The accuracy fell low (train - 65% and test - 48%)
+  
+  **RANDOM FOREST MODEL (OLD VS NEW)**: The random forest model on both the cases have resulted in the same accuracy rate **(of 55.5%)**. The first model we framed, like the cart model, did a good job in predicting the true deal predictions (about 75% correct predictions). But when it came to identifying the deal rates, it failed. Same goes with the new model with the ratio factor, but this time, the model predicted a higher number of deal entries and a bit lower number of non deal entries. Maybe that is why, we find the accuracies remaining a constant. 
+  
+  **LOGISTIC REGRESSION MODELS (OLD VS NEW)**: The logistic models were done using the glm function, with binomail family to predict the deals. We did two models for each of the with-and-without-ratio data. The first model with the threshold as 0.3, the accuracy was close to 50%. This time the deal rates were predicted better than the non deal rates. But the second model upon tweaking the threshold to 0.9 resulted in the non deal entries being correctly predicted with only one entry missing a dominating deal entry. Hence the accuracy rose to a 53%. The new model (1) remained the same nonetheless with an accuracy of 50.05%. It predicted the non deal rates better than the deal entries.
+  
+  One thing to remember is that, we have arriced at results for these models, mostly just by doing text mining which is difficult to interpret when compared to entirely or partially numberical data. We have mostly used only the description to analyse the category, importance and deal chances of the pitch to predict. Moreover the data provided was limited (495 entries) for which training and testing would not be that effective. Hence, when we consider in an overall level, we cannot point blank say that including the ratio column has increased or decreased the accuracy of the models. More larger data would maybe result in better models
+  
+

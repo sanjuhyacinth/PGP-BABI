@@ -1,0 +1,959 @@
+---
+title: "Project 5 - Machine Learning"
+author: "Sanju Hyacinth C"
+date: "22/09/2019"
+output: word_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Problem Statement
+
+This project requires you to understand what mode of transport employees prefers to commute to their office. The attached data includes employee information about their mode of transport as well as their personal and professional details like age, salary, work exp. We need to predict whether or not an employee will use Car as a mode of transport. Also, which variables are a significant predictor behind this decision.
+
+# Problem Objective
+
+We need to predict whether or not an employee will use Car as a mode of transport.
+Also, which variables are a significant predictor behind this decision.
+
+# 1.  Exploratory Data Analysis
+
+## 1.1 Installing the required packages
+
+```{r}
+#install.packages("DataExplorer")
+#install.packages("car")
+#install.packages("dplyr")
+#install.packages("caTools")
+#install.packages("ROCR")
+#install.packages("e1071")
+#install.packages("mlbench")
+#install.packages("lars")
+#install.packages("elasticnet")
+#install.packages("LiblineaR")
+#install.packages("kknn")
+#install.packages("klaR")
+#install.packages("ppcor")
+#install.packages("fastDummies")
+#install.packages('DMwR')
+#install.packages('gbm')
+#install.packages('xgboost')
+#install.packages("ipred")
+#install.packages("rpart")
+
+```
+
+## 1.2 Data loading
+
+```{r}
+
+setwd("D:/R Progms")
+
+car.d = read.csv("Cars.csv")
+
+head(car.d, 10)
+
+View(car.d)
+
+table(car.d$Gender, car.d$license)
+```
+
+## 1.3  Checking for Missing values
+
+```{r}
+
+library(DataExplorer)
+
+plot_missing(car.d)
+
+# We find the presence of NA values in the MBA variable alone from the below plot
+
+car.d = na.omit(car.d)
+# We have omited the one data entry that has an NA value in MBA.
+# Now we have 417 observations in total
+
+```
+
+
+## 1.4 Data structure
+
+```{r}
+
+str(car.d)
+
+# We have 2 existing factor variables (Gender and Transport) and the rest being integer and numeric variables. Later we can convert a few other columns into factor variables.
+
+summary(car.d)
+
+# We have no NA values in the data as we have now removed the one from the MBA variable
+# We can see from the summary that most of the population uses public transport and are men
+# We will have to convert the variables 3, 4 and 8 to factor variables as they can take only two values which will be done later
+
+```
+
+## 1.5 Univariate Analysis - Identifying Outliers
+
+  From the below univariate analysis of the variables, we will be able to understand if there are any outliers or extreme values present in the data.
+  
+```{r}
+
+# AGE:
+
+summary(car.d$Age)
+boxplot(car.d$Age, data = car.d, col = "tomato")
+
+# The age variable comprises of outliers where both the min and max range of 18 and 43 (extreme values) lie.
+
+# Work.Exp
+
+summary(car.d$Work.Exp)
+boxplot(car.d$Work.Exp, data = car.d, col = "aquamarine4")
+
+# The variable work experience also comprises of outliers with some values ranging above 15 years
+
+# Salary
+
+summary(car.d$Salary)
+boxplot(car.d$Salary, data = car.d, col = "lemonchiffon")
+
+# This variable salary comprises of a large amount of outliers when compared to the other two fields.
+
+# Distance
+
+summary(car.d$Distance)
+boxplot(car.d$Distance, data = car.d, col = "purple")
+
+# The distance variable does contain outliers but less when compared to the other variables.
+
+# From the boxplots, we find that all the numeric variables contain outliers (extreme values).
+
+```
+## 1.6 Correlation matrix
+
+```{r}
+library(corrplot)
+
+carcorr = corrplot(cor(car.d[, c(1, 5:7)]), method = "circle", title = "Correlation Matrix", tl.cex = 0.8, tl.col = "dark blue")
+
+library(DataExplorer)
+
+plot_correlation(car.d[, c(1, 5:7)], type = "c")
+
+#Pairwise correlation
+
+library(ppcor)
+pcor(car.d[, c(1, 5:7)], method = "pearson")
+
+```
+
+
+### 1.6.1 Inference from Correlation Plot
+
+From the correlation plot, we infer the below:
+  
+ 1. All the numeric variables (Age, Work.Exp, Salary and Distance) are highly correlated to one another.
+ 
+ 2. Work experience and Salary has high positive correlation of **92%** and **86%** with Age, as we can understand that the older the person is, the higher the work experience. And the correlation between Salary and Age is also explanatory.
+ 
+ 3. Next, we find that there is a high positive correlation of **93%** between Work Experience and Salary too, which is understandable. Higher the work experience, higher is the Salary, hence we can explain the high positive correlation between them.
+ 
+ 4. On the other hand, we find that all the 3 variables (Age, Work.Exp and Salary) are having some sort of a correlation with Distance. This can be neglected as it is not too much.
+ 
+ From the above inference we can assume that there is a presence of multicollinearity between the variables as some of the independent variables seem to show a good amount of correlation.
+ 
+ 
+### 1.6.2  Remedy for multicollinearity:
+
+  This data comprises of all the numerical columns being correlated with each other. The above inference gives the picture of multicollinearity. As discussed in our previous project, we have options to deal with this. We can either use the **Variance Inflation Factor** method, where we will have to do a regression model on the dependent variable with all the independent variables. If all the variables are found to be having a VIF value less than 5, we can go about the problem without the need to remove any variables. But if we find variables having a higher VIF than 5, we will need to remove the variables one by one from the highest VIF. Upon performing regression with the other variables, we will eventually repeat the same steps to arrive at a consistent model with independent variables having VIF less than 5.
+  
+  The other method will be of performing **Principal Components Analysis**, where we will group the variables with a commom group or the variables that provide more or less the **same kind of information**. By this way, we may arrive at the variables or the groups that will not be correlated with the other independent variables of the data. 
+  
+  For this data, we may deploy either of the methods PCA method where we can combine the variables that provide similar details, like the work experience and age which contribute to the salary. This may be combined to a group with **superiority** as a header. Or VIF to remove the most correlated varibles.  
+  
+  This is a remedy to remove multicollinearity in order to construct stable models
+  
+  
+## 1.7 Bivariate Analysis - Plots and Inferences:
+
+```{r}
+
+# Converting the required fields to factor format:
+# The below fields can only hold two values 0 and 1
+
+car.d$Engineer = factor(car.d$Engineer)
+car.d$MBA = factor(car.d$MBA)
+car.d$license = factor(car.d$license)
+
+str(car.d)
+
+library(ggplot2)
+
+den.plot <- ggplot(data=car.d, aes(x=car.d$Age, fill=car.d$Transport))
+den.plot2 = den.plot + geom_density(stat="density", alpha=I(0.2)) + xlab("Age") +  ylab("Density") + ggtitle("Histogram & Density Curve of Age")
+
+den.plot2
+
+# The above density plot shows that most of the youngsters between the age group of 20-30 mostly use 2 wheelers and public transport. Whilst the older people between age 30-43 choose to travel by car.
+
+# We also get a clear picture from the plot that no one below the age of 25 uses a car for transportation.
+
+p1 = ggplot(data = car.d) + geom_histogram(mapping = aes(x = car.d$Age, fill = car.d$Transport))
+p1
+
+# This plot is another illustration of the measure of people who use all modes of transport. We can say that almost all the employees between the age group of 22-28 use only either 2 wheelers or public transport, where many of them use the latter. People between the age of 30-43 mix the choices and use cars too, but beyond the age of 36, we can be sure from the plot that the employees use only cars and not any other transport.
+
+p2 = ggplot(data = car.d) + geom_histogram(mapping = aes(x = car.d$Work.Exp, fill = car.d$Transport))
+p2
+
+# From this plot, we see that employees below work experience of 9 years use either 2 wheelers or public transport only, whereas we can also see that employees with experience of 18+ years use only cars as their mode of commute. Inshort, employees in their beginning years use the 2 wheelers and public mode, and those in their senior level of work prefer to use only cars to commute. And there are people in between these two ranges who use all three.
+  
+# DEEPER ANALYSIS
+p3 = ggplot(data = car.d,aes(y= car.d$Work.Exp, x= car.d$Salary))+
+  geom_point(aes(color = car.d$Transport)) 
+p3
+
+# First of all, we can see the positive correlation between work experience and salary
+
+# Secondly, this plot shows accurately how many employees choose to commute by car. Let's break it down. We have 2-3 employees commuting by car having 10 years of work experience and ideal salary. The employees whose salary range is between 31 and 34 also commute only by car. Then comes the employees who are the seniors with work experience over 17 and salary over 38 who also commute only by car. 
+
+p4 = ggplot(data = car.d,aes(y= car.d$Work.Exp, x= car.d$Salary))+
+  geom_point(aes(color = car.d$Gender)) 
+p4
+
+# We know that the population on this data has most amount of men who are more than double the population of women. Most of them are under 15 years of work experience. To be gender specific we can fairly assume that most of the employees in the top order are men with experience over 15 years and salary package over 35.
+
+table(car.d$Transport, car.d$Gender)
+
+# Most of the population travels by public transport is something that we are already aware of. But from this table, we confirm that about 63% of the entire female population and almost 75% of the entire male population make use of the public commute system. The male employees travelling by car is almost 5 times that of the female employees.
+
+# Based on the population percentage, we can see that only 25% of the male population commute on their own whereas it is about 37% for the female population 
+
+table(car.d$license, car.d$Transport)
+
+# This table shows the number of people who own a licence against the commute modes
+
+table(car.d$Gender, car.d$license)
+
+# From the above observation and from this table, we can see that only about 5% of the female employees and 26% of the male employees own a license. This license could be assumed as car licence, as no one would be eligible to ride two wheelers without proper licence. This explains the numbers for public transport as well.
+
+# A better visualisation of the above statements is given in the below plot
+p5 = ggplot(data = car.d,aes(y= car.d$Work.Exp, x= car.d$Salary))+
+  geom_point(aes(color = car.d$Gender, shape = car.d$Transport)) 
+p5
+
+
+p6 = ggplot(data = car.d, aes(x=car.d$Transport, y=car.d$Distance)) + geom_boxplot(aes(fill = car.d$Gender))
+p61 = p6 + labs(title = "Commute Split",x="Commute", y="Distance",fill = "Gender")
+p62 = p61 + theme(panel.background = element_rect(fill = "light grey"))
+p62
+
+# In this plot we find that in the order of the choice of commute, we see the employees choosing public transport for shorter distances with a median of 9 and 10 units for female and male employees respectively. The next choice of commute for a longer distance is 2 wheelers with a median distance of 12.5 and 12 units for female and male employees respectively. And finally we have the employees commuting by car for longer distances of median of 16 and 18 units for female and male employees respectively. Here we have one female employee commuting by 2 wheeler for a 21 unit distance
+
+p7 = ggplot(data = car.d,aes(y= car.d$Work.Exp, x= car.d$Distance, col = car.d$Transport))+ geom_point() + geom_smooth(method = "lm",se = F)+ facet_grid(~car.d$Transport) + facet_wrap(~car.d$Transport, ncol = 2)
+p7
+
+# From this plot, we have 3 graphs showing the relation between work experience and distance for all the modes of commute. For 2 wheelers, we see that the relation shows a negative trend (distance seems to decrease with an increase in work experience) For Cars, there is a positive trend line that with increase in experience, the distance seems to increase as well. There is also a positive trend for public transport but is not that visible. This work experience is also related to age hence the result would be the same.
+
+p8 = ggplot(data = car.d) + geom_histogram(mapping = aes(x = car.d$Salary, fill = car.d$Engineer))
+p8
+
+# We can see the spread of the employees with an Engineering degree. They have branched out to the senior level, but mot of them are within the salary line of 20. The same also applies for employees without an engineering degree. The highest paid employee holds an engineering degree is quite evident
+
+p9 = ggplot(data = car.d) + geom_histogram(mapping = aes(x = car.d$Salary, fill = car.d$MBA))
+p9
+
+# This plot is almost like the opposite of the previous plot. From this we can find most of them not having an MBA degree. The highest paid employee does not have an MBA degree as we have previously found the employee having an engineering degree.
+
+```
+
+# 2. Data Preparation:
+
+  We make use of the library **fastDummies** and the function **dummy_cols**to generate some dummy variables for the response field in order to faciltate constructing a good and effective regression model. As we are asked to predict if the employees would take the Car as a commute or not, we are trying to make the variable easy for a binomial prediction model.
+  
+```{r}
+# Creating dummy variables for the response category column as we have more than 2 levels in it.
+
+library(fastDummies)
+
+# creating dummy variables for the target column
+
+car.dn = dummy_cols(car.d, select_columns = "Transport")
+
+# As we need only the column with the probabilities of employees travelling by car, we may remove the other two dummy variables
+
+library(dplyr)
+
+car.dn = select(car.dn, c(-9,-10,-12))
+
+View(car.dn)
+
+```
+
+## 2.1 Checking the balance in data:
+  
+```{r}
+# Imbalanced data
+
+library(caTools)
+set.seed(248)
+sample = sample.split(car.dn,SplitRatio = 0.7)
+train = subset(car.dn,sample == TRUE)
+test = subset(car.dn, sample == FALSE)
+
+nrow(train)
+nrow(test)
+
+View(train)
+View(test)
+
+table(train$Transport_Car)
+table(test$Transport_Car)
+table(car.dn$Transport_Car)
+
+# testing data distribution
+
+prop.table(table(train$Transport_Car))
+prop.table(table(test$Transport_Car))
+prop.table(table(car.dn$Transport_Car))
+# We find that the data has very less of people commuting by car (only 8% of th total population)
+
+# Plotting to visualise
+
+barplot(prop.table(table(car.dn$Transport_Car)),
+        main = "Car Commute distribution")
+
+# Even the barplot shows less than 10% of the people using car
+
+```
+
+## 2.2  Model on imbalanced data:
+
+  We have found that the data here is imbalanced with the target level not being sufficient for constructing an unbiased model. Let us now run a logistic regression model on the present unaltered data to find some results.
+  
+```{r}
+
+# Logistic model on the imbalanced data:
+# Logistic Model 1
+
+logit1 = glm(Transport_Car~., data = train, family = "binomial")
+summary(logit1)
+# Only the distance seems to be a significant variable
+
+# Prediction on test data:
+
+test.pred = predict(logit1, newdata = test, type = "response")
+table(test$Transport_Car, test.pred>0.5)
+
+# Our logit1 model has almost predicted correctly except one identified incorrectly for both instances
+
+# Accuracy 
+
+(125+11)/nrow(test)
+
+# This model is a 98.5% accurate keeping in mind how the model has identified almost correctly all the time.
+
+library(ROCR)
+rocr.pred = prediction(test.pred, test$Transport_Car)
+
+
+# Area Under the Curve is calculated
+as.numeric(performance(rocr.pred, "auc")@y.values)
+
+
+# 99 percent of the time, the model has given correct predictions
+
+perf = performance(rocr.pred, "tpr", "fpr")
+plot(perf)
+
+# For this data, we can justify that the model has made very good predictions on this data, missing out just one or two predictions and giving a 98% accuracy
+
+```
+  
+  We find that even on an imbalanced data, the accuracy we have got is over 98%. We may still have to proceed with balancing the data to check if the accuracies change or do not change any further after applying the SMOTE technique. 
+  
+  
+## 2.3  SMOTE (Synthetic Minority Oversampling Technique)
+
+  SMOTE is a function that is used generate synthetic data points for an imbalanced data, in order to tweak up the minority class in the data. For an imbalanced data where the majority class is more than 90%, a model constructed on that would be having results dominated by the majority class. This will have an impact on the model, where the machine learning algorithm could simply classify everything as the majority class and still be correct 90% of the time. In order to effectively control this situation, we employ the function SMOTE.
+  
+  Let us now work on pur data and see how well SMOTE can control this situation. We will run the same models as we did on the data originally.
+  
+```{r}
+
+# Working with SMOTE
+
+library(DMwR)
+
+sm.train<-subset(car.dn, sample == TRUE)
+sm.test<-subset(car.dn, sample == FALSE)
+
+# The amount of 0 nd 1 on the smote train data
+table(sm.train$Transport_Car)
+
+sm.train$Transport_Car<-as.factor(sm.train$Transport_Car)
+# converting to factor
+
+bald.car.tr <- SMOTE(Transport_Car ~., sm.train, perc.over = 100, k = 5, perc.under = 500)
+
+#perc.over means that 1 minority class will be added for every value of perc.over
+
+# We are adding 100 percent of our existing minority class to the value 
+
+# perc under - for every minority class generated we have retained 500 percent of the minority class. That will be 23*5
+
+table(bald.car.tr$Transport_Car)
+
+# This table has increased the minority class by 100 perc over and has also decreased the majority class
+
+# Checking the proportion of the smote train data:
+
+prop.table(table(bald.car.tr$Transport_Car))
+
+```
+ As we see from the above split of data, we have 71% on the majority class (which indicates employees who do not commute by car) and the minority class raise to roughly about 29% .Now that our data is ready for the models to be performed, let us now go to the modelling section
+
+# 3.  Modeling:
+
+## 3.1  Logistic Regression:
+
+  Let us first look at our logistic regression model, continuing from the previous task. We will use the smoted train and test data here in order to produce an effective and unbiased model. 
+  
+```{r}
+# Logistic model on the smoted data:
+# Logistic Model 2
+
+logit2 = glm(Transport_Car~., data = sm.train, family = "binomial")
+summary(logit2)
+# Here too the distance seems to be a significant variable
+
+# Prediction on test data:
+
+test.pred2 = predict(logit2, newdata = sm.test, type = "response")
+table(test$Transport_Car, test.pred2>0.5)
+
+
+# Our logit2 model has almost predicted correctly except one identified incorrectly for both instances
+
+# Accuracy
+(125+11)/nrow(sm.test)
+
+
+# This model is a 98.5% accurate keeping in mind how the model has identified almost correctly all the time.
+
+library(ROCR)
+rocr.pred2 = prediction(test.pred2, sm.test$Transport_Car)
+
+# Area Under the Curve is calculated
+as.numeric(performance(rocr.pred2, "auc")@y.values)
+# 99 percent of the time, the model has given correct predictions
+
+# ROC Calculation
+perf2 = performance(rocr.pred2, "tpr", "fpr")
+plot(perf2)
+
+# For this data, we can justify that the model has made very good predictions on this data, missing out just one or two predictions and giving a 98% accuracy
+# This is exactly the same as our model for the imbalanced data.
+
+# Let us tweak up the probability threshold to 0.8 for prediction
+# Prediction on test data:
+
+test.pred3 = predict(logit2, newdata = sm.test, type = "response")
+table(test$Transport_Car, test.pred3>0.8)
+
+# Our logit2 model with the prob to 0.8 has falsely identified 2 predictions which were true but still has got 4/5th of it correctly
+
+# Accuracy
+(125+10)/nrow(sm.test)
+
+# This model is a 97.8% accurate and little less when compared to our previous model with prob threshold of 0.5
+
+library(ROCR)
+rocr.pred3 = prediction(test.pred3, sm.test$Transport_Car)
+
+# Let us look at the Area Under the Curve
+as.numeric(performance(rocr.pred3, "auc")@y.values)
+# This has not changed at all and still has given 99.4% accurate results
+
+# ROC Calculation for perf3
+perf3 = performance(rocr.pred3, "tpr", "fpr")
+plot(perf3)
+
+# There is not much difference in the model except that the accuracy has come down to 97.8% 
+# almost around 98% from 98.5% as we have increased the threshold from 0.5 to 0.8
+
+```
+
+
+## 3.2  K Nearest Neighbour Algorithm:
+
+  KNN, as it is popularly called, is a Supervised Machine Learning algorithm that helps to classify a data point to it's assigned variable or target class, by analysing the nearest neighbours of the data point. Hence the name, nearest neighbour. And K is the value we assign to the model in order for the algorithm to focus on the desired K number of neighbours for analysis.
+  KNN works only on numerical variables as it involves calculation of distances between each datapoint of the numeric variable. Mostly, the assigned K value is **odd** to avoid any ties between the selected data point.
+  
+  Let us go about the algorithm
+  
+```{r}
+# Preparing data:
+
+library(dplyr)
+library(fastDummies)
+
+setwd("D:/R Progms")
+
+cardata = read.csv("Cars.csv")
+
+cardata = na.omit(cardata)
+
+# creating dummy variables for the target column
+
+cardata = dummy_cols(cardata, select_columns = "Transport")
+
+cardata = select(cardata, c(-9,-10,-12))
+
+View(cardata)
+# Let us remove the first two columns as knn requires only numeric data for distance
+cardatanew = select(cardata, c(-2))
+
+View(cardatanew)
+
+```
+
+### 3.2.1  Normalising data
+
+  We all know the KNN algorithm performs well with all the data being in numerical format. But we cannot be sure if all the numerical data are of the same units of measurement. Hence, in order to perform the model effectively and to obtain unbiased result, we will have to **normalise the numerical data** we are using for the algorithm. After going about the standardisation, we will obtain a data ranging between the values of 0 and 1, thus making it even.
+  
+  By using the below set of codes, we will arrive at the data that is standardised for the model.
+  
+```{r}
+
+# Data Normalization function
+
+norm = function(x) { (x- min(x))/(max(x) - min(x)) }
+
+# Eliminating the dependent variable 
+# As we only normalise the independent variables with the norm function
+
+norm.data = as.data.frame(lapply(cardatanew[,-8], norm))
+
+View(norm.data)
+
+# Let us now bind back the dependent variable to the normalised data
+# To facilitate model construction
+
+usable.data = cbind(cardatanew[,8], norm.data)
+
+str(usable.data)
+
+View(usable.data)
+
+```
+### 3.2.2  KNN Classifier
+
+   Let us now partition the data into training and testing datasets in order to run the KNN algorithm. Here we have to keep in mind is an **optimum number for K is what that will produce a good model**. A smaller k will result in a rather overfitting model and a larger k may not capture as much details from the data, thereby missing on important ones.
+  
+  By default, K can take a value of 19 or the square root of the number of observations in the data. But we have to make sure to select the optimum number so as to avoid over or under fitting of the model.
+  
+```{r}
+# Data Partioning
+
+library(caTools)
+
+set.seed(248)
+
+spl = sample.split(usable.data$`cardatanew[, 8]`, SplitRatio = 0.7)
+c.train = subset(usable.data, spl == T)
+c.test = subset(usable.data, spl == F)
+
+# KNN Classifier:
+table(sqrt(291), sqrt(126))
+
+# Let us take the k value to be 19 per usual.
+# As the sqrt of the observations results to about 20
+# As per our guess, either 19 or 21 would give us the best model accuracy
+
+library(class)
+
+pred1 = knn(c.train[-1], c.test[-1], c.train[,1], k = 19) 
+table.knn1 = table(c.test[,1], pred1)
+sum(diag(table.knn1)/sum(table.knn1))
+# Accuracy of 97.62% keeping k as 19
+
+# Assigning k to be 21 and checking for accuracy:
+pred2 = knn(c.train[-1], c.test[-1], c.train[,1], k = 21) 
+table.knn2 = table(c.test[,1], pred2)
+sum(diag(table.knn2)/sum(table.knn2))
+# Accuracy of 97.62% still remains he same as model 1
+
+pred3 = knn(c.train[-1], c.test[-1], c.train[,1], k = 23) 
+table.knn3 = table(c.test[,1], pred3)
+sum(diag(table.knn3)/sum(table.knn3))
+# Accuracy still maintains the same to 97.62% as the previous model 
+
+pred4 = knn(c.train[-1], c.test[-1], c.train[,1], k = 25) 
+table.knn4 = table(c.test[,1], pred4)
+sum(diag(table.knn4)/sum(table.knn4))
+# Accuracy falls down to 96.82%  
+
+
+```
+
+### 3.2.3  Inference from KNN:
+  
+  From this we may understand that a higher k value than the optimum would tend to miss out on many details and provide an underfitting model. While on the other hand, a model with k as low as 3 would give an overfitting model with accuracy seemingly greater than the other models. This may happen as the model tends to capture all the minute details including the noise from the data, which results in a model that tackles all minute issues.
+
+  Back to our models, the difference in accuracy from 19 to 25 revolved around the same level.The accuracy given by k=19 to k=23 are the same. And the accuracy given by the model with k=25 tends to be a little less than the first three models. From the above model accuracies we can confirm the model 2 or 3 with k = 21 and k=23 are good fit models as it is technically equal to the square root of the observations
+  
+
+## 3.3  Naïve  Bayes:  
+
+  Let us take the same cardata
+  Naïve Bayes, an extremely powerful tool, is technically used only when the data set has all of its variables in a categorical format. However, it can also be used with continuous features but is more suited to categorical variables. Naïve Bayes is a recommended algorithm if all the independent and dependent variables are categorical. Naïve Bayes is a parametric algorithm. Hence, we may not obtain different results upon re executing the function unless the data remains unchanged.
+  
+  In our case, although our dependent variable is categorical (as in the case of any data with a problem statement), we have equal number of independent variables in numeric format. Let us now convert the required variables to categorical variables
+  
+```{r}
+# Let us load the package e1071 
+# Since e1071 has the naiveBayes function 
+
+library(e1071)
+library(caret)
+
+# Let us use the data cardata for this model and split for train and test data
+
+library(caTools)
+set.seed(248)
+sample2 = sample.split(cardata,SplitRatio = 0.7)
+train2 = subset(cardata,sample2 == TRUE)
+test2 = subset(cardata, sample2 == FALSE)
+
+# train2 has 279 obs and test2 has 138 obs
+
+# training the model on the train dataset
+NB = naiveBayes(Transport_Car~., data = train2)
+print(NB)
+# From this model, we find that the classification given for gender is perfect as it is categorical
+# Whereas the other variables do not seem to be explained well by Naïve Bayes
+
+# Let us convert the required fields to categorical
+
+train2$Engineer = factor(train2$Engineer)
+train2$MBA = factor(train2$MBA)
+train2$license = factor(train2$license)
+train2$Transport_Car = factor(train2$Transport_Car)
+
+test2$Engineer = factor(test2$Engineer)
+test2$MBA = factor(test2$MBA)
+test2$license = factor(test2$license)
+test2$Transport_Car = factor(test2$Transport_Car)
+
+# Creating naiveBayes model only on categorical variables
+NB1 = naiveBayes(Transport_Car~Gender+Engineer+MBA+license, data = train2)
+print(NB1)
+
+NB1.pred = predict(NB1, test2, type = "class" )
+
+table(NB1.pred, test2$Transport_Car, dnn = c("Prediction", "Actual"))
+# This table gives an image that the model has predicted all the observations to be 0 
+# while there are 12 entries that are actually 1. And the model has made wrong prediction.
+
+# Acuracy
+
+(126+0)/nrow(test2)
+
+confusionMatrix(NB1.pred, test2$Transport_Car, dnn = c("Prediction", "Actual"))
+
+# the confusion matrix gives an accuracy of 91.3% and since the p value being 0.0015 it is a significant model
+```
+
+ We can see here from the confusion matrix that the model has not made correct predictions when compared to the other two models of KNN and Logistic Regression. Though the model has made correct prediction of 126 people not commuting by car and has made only 12 wrong assumptions, contributing to about 91% accuracy. The fact that it did not predict any number of employees using the car is an indicator that the model fails in its purpose.
+  
+## 3.4 Model comparison - Classification:
+
+```{r}
+library(kknn)     
+library(klaR)  
+library(LiblineaR)
+library(rpart)
+library(fastDummies)
+library(caret)
+library(dplyr)
+
+# loading the fresh data:
+
+setwd("D:/R Progms")
+
+car.d = read.csv("Cars.csv")
+
+# creating dummy variables for the target column
+
+car.dn = dummy_cols(car.d, select_columns = "Transport")
+
+car.dn$Transport_Car = factor(car.dn$Transport_Car, labels = c("No", "Yes"))
+
+car.dn = na.omit(car.dn)
+
+car.dn = select(car.dn, c(-9,-10,-12))
+
+View(car.dn)
+
+str(car.dn)
+
+# CROSS VALIDATION: technique used is K Fold cross validation 
+
+ctrl <- trainControl(method = "repeatedcv", classProbs = T, number = 10, summaryFunction = twoClassSummary, repeats = 2)
+
+# Logistic Regression model
+
+set.seed(248)
+
+modellog <- train(Transport_Car ~ ., data = car.dn, method = "regLogistic", metric = 'ROC', trControl = ctrl)
+
+print(modellog)
+
+# Naive bayes model
+
+modelnb <- train(Transport_Car ~ ., data = car.dn, method = "nb", 
+                 metric = 'ROC', trControl = ctrl)
+
+print(modelnb)
+
+# KNN model :
+
+modelknn <- train(Transport_Car ~ ., data = car.dn, method = "knn", metric = 'ROC', 
+                  trControl = ctrl, tuneLength = 15)
+
+print(modelknn)
+
+plot(modelknn)
+
+# The plot has identified the optimum number of k as 5 by using ROC 
+
+```
+
+## 3.5 Remarks on the best model:
+
+  We have constructed 3 models plus a regression model with the SMOTE data. And based on the accuracies, we have validated the best model
+
+  * Our logistic regression model gives a better accuracy of 98.5% when compared to our other models on KNN and Naive bayes. 
+  
+  * The KNN model has also done well in giving a good accuracy of 97.8% 
+  
+  * Though the Naive Bayes model also gave an accuracy of 91%, it did not predict any employee who used cars, though there were actually employees who used cars. The model predicted everyone as non car users. 
+  
+  Hence we classify the Logistic regression model to be a good fit.
+
+
+## 3.6  Bootstrap Aggregating (BAGGING):
+
+  Bootstrap Aggregating, better known as Bagging, is a machine learning ensemble technique which helps to imrpove the stability and accuracy of a model. Bagging helps in reducing the variance in a model, thus preventing overfitting a model. What bagging does is, it splits the train data into many more chunks or combinations with replacements from the training set. This helps in finalising a better model by aggregating the results from the model conducted on the many more subsets of the training data.
+  
+  Let us look at the code
+  
+```{r}
+
+library(fastDummies)
+library(dplyr)
+library(ipred)
+library(rpart)
+
+setwd("D:/R Progms")
+
+car.data = read.csv("Cars.csv")
+
+# creating dummy variables for the target column
+
+car.data = dummy_cols(car.data, select_columns = "Transport")
+
+car.data = na.omit(car.data)
+
+car.data <- select(car.data, c(-9,-10,-12))
+
+View(car.data)
+
+str(car.data)
+
+```
+
+```{r}
+
+# Splitting data to train and test.
+
+library(caret)
+library(caTools)
+
+set.seed(248)
+split = sample.split(car.data,SplitRatio = 0.7)
+cartrain = subset(car.data,split == TRUE)
+cartest = subset(car.data, split == FALSE)
+
+# cartrain has 279 obs
+# cartest has 138 obs
+
+# control details for rpart
+
+rpctrl = rpart.control(maxdepth=7, minsplit=5)
+
+# Model for bagging
+car.bagging <- bagging(Transport_Car~., data = cartrain, control = rpctrl)
+
+# Running on the test data for prediction
+cartest$pred = predict(car.bagging, cartest)
+
+table(cartest$Transport_Car,cartest$pred >0.5)
+
+# Accuracy
+
+(125+11)/nrow(cartest)
+
+# This has given an accuracy of 98.55% which a little much more than our KNN model on the data.
+# This accuracy is almost equal to our logistic regression model
+
+
+# Tweaking the threshold to 0.7
+table(cartest$Transport_Car,cartest$pred >0.7)
+
+(126+11)/nrow(cartest)
+
+# This tweak shows that the model with some bagging has booted the accuracy to 99.28% 
+# This is significantly higher than the first model as the model has identified all those who do not 
+# use a car correctly. It has only mispredicted at one instance and correctly predicted those who used
+# a car
+
+# Thus by bagging the imbalanced data, we have obtained the best model of all after bagging. 
+# And the accuracy is higher than all of our other models (logistic regression, knn and naive bayes)
+
+```
+
+## 3.7 Boosting:
+
+### 3.7.1 GBM model 1
+
+```{r}
+
+# Basic boosting model:
+
+library(gbm)
+library(xgboost)
+
+gbm.fit <- gbm(
+  formula = Transport_Car ~ .,
+  distribution = "bernoulli",
+  data = cartrain,
+  n.trees = 500, 
+  interaction.depth = 1,
+  shrinkage = 0.001,
+  cv.folds = 5,
+  n.cores = NULL, 
+  verbose = FALSE
+)  
+
+# we are using bernoulli because we are doing a logistic and want probabilities
+# n.trees - the number of stumps
+# interaction depth - number of splits it has to perform on a tree (starting from a single node)
+# shrinkage is used for reducing, or shrinking the impact of each additional fitted base-learner(tree)
+# c.v. folds - cross validation folds
+# n.cores will use all cores by default
+# verbose - after every tree/stump it is going to show the error and how it is changing
+
+cartest$pred <- predict(gbm.fit, cartest, type = "response")
+
+# we have to put type="response" just like in logistic regression else we will have log odds
+
+table(cartest$Transport_Car,cartest$pred>0.5)
+
+(126+0)/nrow(cartest)
+
+# This model using the gbm boost has done a very good fit of correctly predicting all the 0s. So a 100% correct prediction
+# But when it comes to predicting the employees using car as a mode of transport, the model has not predicted any of it correctly, making all predictions as 0
+
+```
+
+  Let us tweak the gbm fit a little to get the best fit. Since XGBoost works with matrices that contain all numeric variables, we are unable to deplot the same with our data. Moreover, our data is quie small having only 417 observations and the model does not take a lot of time to fit the model to our data. Hence the Gradient Boost Model would suit best for this data.
+  
+### 3.7.2 GBM model 2
+
+```{r}
+# GBM model 2
+
+gbm.fit2 <- gbm(
+  formula = Transport_Car ~ .,
+  distribution = "bernoulli",
+  data = cartrain,
+  n.trees = 1000, 
+  interaction.depth = 1,
+  shrinkage = 0.001,
+  cv.folds = 5,
+  n.cores = NULL, 
+  verbose = FALSE
+)  
+
+# for the above, we are increasing the n.trees to 1000. Thus the model will be build using 100 trees
+
+# Let us test it on our validation set
+cartest$pred <- predict(gbm.fit2, cartest, type = "response")
+
+table(cartest$Transport_Car,cartest$pred>0.5)
+
+(126+9)/nrow(cartest)
+
+# This model has got better than the last one
+# In this fit, we still find that the model has correctly predicted the false values a 100% correctly
+# And also a better identification (75%) of the true values of employees using car as a commute 
+# And this gives an accuracy of 97.83% which is much better than our last model with 91.3%
+
+```
+
+### 3.7.3 GBM model 3
+
+```{r}
+
+# Let us now keep the n.trees as 1000 ,the same as last model 
+# Now we tweak the learning rate to 0.01 keeping the rest same as our last model
+# Let us do our 3rd gbm fit on the training set
+  
+gbm.fit3 <- gbm(
+  formula = Transport_Car ~ .,
+  distribution = "bernoulli",
+  data = cartrain,
+  n.trees = 1000, 
+  interaction.depth = 1,
+  shrinkage = 0.01,
+  cv.folds = 5,
+  n.cores = NULL, 
+  verbose = FALSE
+)
+
+# Let us test it on our validation set
+cartest$pred <- predict(gbm.fit3, cartest, type = "response")
+
+# Accuracy - confusion matrix
+table(cartest$Transport_Car,cartest$pred>0.5)
+
+(126+11)/nrow(cartest)
+
+# This is the best fit tht could be for the data, as this gives an accuracy of 99.28%
+# Firstly, it has correctly predicted all the 0s which is the employees who do not use car as their commute
+# Secondly, this model has almost predicted all the employees who choose to use car as their commute, leaving out just one
+
+```
+
+# 4. Actionable Insights and Recommendations
+
+  From all the above conducted models, we can say that there has been a huge improvement on the model effeciency.
+While before constructing a model, we can assume that even with no model built, we can be 91% accuracte of our findings because we were presentee with an unbalanced data, that gave more than 90% information about the employees who chose not to travel by car. While our problem statement required us to predict the employees who will use car as their mode of transport.
+
+  * The first problem we had was that the data was **unbalanced** with only less than 10% of the target class. Hence we used SMOTE for our data, which undersampled our majority class to roughly 72% and our minority class (target) But we did not see a huge improvement in the logistic regression model on the smoted data. The accuracies almost remained the same for the logistic model on the imbalanced and the smote data. Hence that did not help.
+  
+  * We conducted models using 3 algorithms. Logistic regression, K Nearest Neighbour and Naive Bayes. Out of which, logistic regression performed well followed by KNN. But the Naive Bayes model failed in its purpose becasue it did not predict the employees who actually use cars as their mode of commute. Though it had a very good accuracy of correctly predicting the employees who did not use cars
+  
+  * Upon EDA, we found that there was multicollinearity as variables such as age, work experience and salary were very much related to each other and had a positive correlation. We also found that most of the people with a higher age, experience and salary chose to travel by cars. This may be because, the growth is positively correlated to affordability. It may also be that the seniority has some status issues and the reason why the senior people chose to travel by cars. This also explains why a lot of young employees (in work experience as well) chose two wheelers or public transport
+  
+  * We also figured a reason why most of them chose to travel by public transport as most of them did not own a license. And we can also say it was women with lesser percentage of licence (roughly 6%) than the men (26.3%)
+  
+  * The data in itself is a small one and a larger data set would help. This is because the target was not well achieved as the model could not be well trained with just limited amount of data on the target (predicting the number of employees who will use car needs data that actually has enough number of entries that have people using cars to facilitate in training the model).
+  
+  
+
+
+

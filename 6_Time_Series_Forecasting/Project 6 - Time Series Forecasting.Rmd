@@ -1,0 +1,408 @@
+---
+title: "Project 6 - Time Series"
+author: "Sanju Hyacinth C"
+date: "23/10/2019"
+output: 
+  pdf_document: 
+    fig_height: 4
+    fig_width: 7
+    toc: yes
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+# Project Objective:
+
+  To analyse and explore the time series dataset of **gas**, in-built in R, about the **Australian monthly gas production**. We are also asked to build an appropriate ARIMA model and report on the accuracy.
+  
+# Required Packages:
+
+```{r}
+
+#install.packages("forecast")
+#install.packages("ggplot2")
+#install.packages("caTools")
+#install.packages("dplyr")
+#install.packages("tseries")
+
+```
+
+
+# **Question 1**
+
+## Data loading and exploration:
+
+```{r}
+
+library(forecast)
+
+# Loading the dataset from the forecsast package
+forecast::gas
+
+# Converting the gas data to a time series dataset
+gts = ts(gas, start = c(1956,1), frequency = 12)
+
+# Printing the structure and class of data
+str(gts)
+
+# "ts" refers to time series data
+class(gts)
+
+# To print the start and end of the ts data
+start(gts); end(gts)
+
+# Mode gives the data format
+mode(gts)
+
+# Print the summary of the ts data (usually not necessary for time series data)
+summary(gts)
+
+
+```
+
+## Data Plotting:
+
+  Let us look at the season plot and the month plot for the time series data.
+  
+```{r}
+
+plot(gts)
+
+# We see that until 1970, there has been a steady production of gas with no increase or decrease.
+# But after 1970, we see a steady increase in production. 
+# Though there are dips here and there accounting for outliers, it pretty much shows a positive trend. 
+# We can ignore the years uptill 1970 as these were the starting years and do not show that much stability.
+
+# Season plot:
+seasonplot(gts, year.labels = TRUE, year.labels.left = TRUE, col = 1:12)
+
+# Month plot:
+monthplot(gts, main = "Monthplot of gas production")
+
+# Boxplot:
+boxplot(gts~ cycle(gts))
+
+```
+
+```{r}
+
+# Aggregation at quarter and year level
+
+gts.qrt = aggregate(gts, nfrequency = 4)
+gts.yr = aggregate(gts, nfrequency = 1)
+
+plot(gts.qrt)
+plot(gts.yr)
+
+```
+
+# **Question 2**
+
+## Observation and Inference from the plots:
+
+  Even in the season plot we see that uptil 1970, we do not find significantly growing production of gas. Except a little increase that started during the June of 1969 the rest of the months previous to 1969 show almost equal production within the years. The highest production recorded is during the July of 1995. 
+  
+  One more noteworthy point is, upon looking at the overall season plot, we see uptil the summer months there is an increased production and this goes down during the rainy and winter season. Most of the years show this change, which may contribute to seasonality.
+
+  From the monthplot and the boxplot we see that the production of gas follows a trend of increased production till July and gradually decreases throughout the year. We can, thereby assume it to follow some sort of a seasonlity pattern.
+  
+  
+## Components of the time series present in the data:
+
+  Upon continuing with the above inferences, we can assume the data to have both **trend and seasonality**. The data begins to be not showing any trend until 1970. After which, we see that the production of gas increased over the years, thus showing a **positive trend**. 
+  
+  The same can be applied for seasonlity but it still is quite tricky to conclude that the data has seasonlity. From our seasonplot, boxplot and monthplot, we can observe quite a pattern. Ultimately, the production of gas has followed an increasing pattern upto July, and is seen to be decreasing after July. With the lowest production during January and the highest being July. 
+  
+# **Question 3**
+
+## Periodicity:
+
+  The periodicity of the time series dataset is a pattern that occurs at regular time intervals. 
+  
+  The time series can be **seasonal or cyclical** based on the pattern repetition. We are sure that our data is a **monthly time series data** having one observation per month. But what can we say about the pattern or periodicity of the subject time series data.
+  
+  From the above graphs, we see that between the years **1974 - 1981** there seems to be a perfect seasonality and an increasing trend. But beyond that, we can see an **inconsistency** in both trend and seasonality. Though there is some of both seen till 1990; after 1990, we see there is neither a trend line nor a visibly stable seasonality. The few points were the value goes below the normal production cannot necessarily be considered outliers, but they seem inconsistent, which could be sampling error. 
+  
+  Also the fact that, the production was **constant** during the beginning years until 1970, a regular **increase** in production until 1990 and the **inconsistent or a mildly stagnant production** of gas after 1990 seems that this could might as well be a **long run cycle**. We might assume (to a very less degree) that the production of gas after the given years may **remain stagnant** for a few more years and **fall down or decrease**. This indicates that there are chances of identifying a **cyclic pattern** in this data.
+  
+  
+```{r}
+
+frequency(gts)
+
+decompgas.a = decompose(gts, type = "additive")
+plot(decompgas.a)
+
+decompgas.m = decompose(gts, type = "multiplicative")
+plot(decompgas.m)
+
+
+# There isn't much change in the seasonality of both the graphs, hence we can consider the data as an additive time series data.
+
+# Individual components
+
+plot(decompgas.a$seasonal)
+plot(decompgas.a$trend)
+plot(decompgas.a$random)
+
+# The trend seems to be significant
+
+```
+
+# **Question 4**
+
+## Stationarity of the Time Series data:
+  
+  A stationary time series is one whose properties do not depend on the timeat which the series is observed. The series will not have any predictable pattern. Another name for a stationary series is **White noise**. 
+  
+  We are aware that forecasting can be done only on a **stationary time series** data. If a time series data is not found to be stationary, we will first have to **stationarize the series**. A stationary time series has to have a **constant mean and variance**. 
+  
+  In our time series data, we find that the time series data definitely has a trend and a seasonality pattern. Usually time series with trend and seasonality is **non-stationary** as both trend and seasonality will affect the value of the time series at different times. Hence we may assume our data to be non stationary.
+  
+## Test for Stationarity:
+
+  As per our visual assumption, we see that the time series data, as having a trend and seasonality, is non-stationary. Hence we will have to **stationarize** the data first to be able to do forecasting on it.
+  
+  For this, we use the **Augmented Dickey-Fuller test**. This test is used to test whether a time series data is non stationary. There is a null and alternate hypothesis for the process. A lower p value will state that the time series is stationary.
+  
+  Let us install and run the **tseries** library to access the **adf.test** function, which refers to the **augmented dickey-fuller test**. 
+  
+```{r}
+
+# Install and load the library tseries
+
+library(tseries)
+
+# Augmented Dickey-Fuller test
+
+adf.test(gts)
+
+# Dickey-Fuller = -2.7131
+# p-value = 0.2764
+# Lag order = 7
+
+```
+
+## Hypothesis for ADF test:
+
+  Our above adf test on the gas.ts dataset has given a p-value of **0.2764**. As this is a test to stationarize the time series data, we have the below hypothesis made.
+  
+  **Null Hypothesis (H0) = Time series is not stationary**
+  
+  **Alternate Hypothesis (Ha) = Time series is stationary**
+
+  Only when the p-value is **less than or equal to 0.05** can we straight away reject the null hypothesis to approve the alternate hypothesis of the time series being stationary. In this case, as we have obtained a p-value not less than or equal to 0.05, we are **unable to reject the null hypothesis** and approve of the alternate hypothesis that the time series is stationary.
+  
+### Since we have proved that our time series data is not stationary, we have create a **difference series**, ie. the difference of consecutive terms in a time series known as the **difference series of order 1**. This will help us to stationarize the time series data.
+
+
+## De-seasonalising the time series:
+
+  
+```{r}
+
+# Decomposing using stl
+
+des.gas = stl(gts, s.window = "p")
+plot(des.gas)
+
+# Deseasoning data
+
+DeseasonGas1 = seasadj(des.gas)
+plot(DeseasonGas1)
+
+# Comparison
+plot(gts)
+
+## We do not see that much seasonality upon decomposition
+
+```
+
+
+  From the above **deseasonalised data**, we find that the effect of seasonality is now very less on the dataset. Deseasonlised data comprises of components exclusive of the seasonality factor. Hence while plotting these two together, we confirm that there has been a **presence of seasonality** and that now **the significance of seasonality is not so high on the data** after deseasonalisation.
+
+
+## Detrending the series:
+
+  Upon deseasonalising the data, we are now detrending the data inorder to make it a stationary series. And then we are about to take the Augmented Dickey-Fuller Test on the differenced series.
+  
+```{r}
+
+# Differencing the deseasonalised data
+
+gts.df = diff(DeseasonGas1, differences = 1)
+plot(gts.df)
+
+# We see a lot of sharp and extreme ponits beyond 1980 but they still lie close to the central line
+
+# Augmented Dickey-Fuller Test on the differenced data
+
+adf.test(gts.df)
+
+# Dickey-Fuller = -18.14
+# Lag order = 7
+# p-value = 0.01
+
+```
+
+   The result of Augmented Dickey-Fuller Test on the differenced data **gts.df** shows a very significant and less p-value of **0.01** (which is the minimum value to be printed showing that the p-value is less than the printed value of 0.01). By this we can **reject the null hypothesis** and approve of the alternate hypothesis that the time series is **stationary**.
+    
+This series is known as the **difference series of order one**
+
+# **Question 5**
+
+## Autocorrelations and Partial Autocorrelations:
+
+  Though our original data is non stationary, we have our differenced data that is stationary. Hence, we can go about the next process of finding the **auto correlations and partial auto correlations** on the differenced data. Auto correlation can be done only on stationarised data, that does not have the effect of trend or seasonality. 
+  
+  Auto correlation is referred to as correlation with self. It consists of different **orders**. Auto corrrelation of different orders give inside information about the time series we are dealing with for analysis and forecasting. The auto corrrelation values range between **-1 and +1 only**. The values nearing -1 and +1 may correspond to a negative and positive correlation. And the values closer to 0 indicate no correlation. 
+  
+  The auto corrrelation of order 0 will be 1 as all the values correlate to itself which will show a full or complete correlation. But we will also do correlations of different degrees or orders. The 1st order auto correlation will have the correlation between the original values with lag 1 values (shifting the values to the next corresponding place, like the first value moves to the second and so forth). There can be as many lags. 
+  
+  Let us look as the auto corrrelation for the data with lag upto 50.
+  
+```{r}
+
+# Auto correlation on the original data
+acf(gts, lag.max = 50)
+
+# Trying with a lag 100
+acf(gts, lag.max = 100)
+
+# The auto correlation of the original with lag 0 is always 100% or 1
+
+```
+ 
+  The significance of the auto correlation is not much if the values are within the blue dotted bands. When they are outside of the bands, we can say that there is a dependency of the data on these auto-correlations. The original data is dependent on the so and so lag series. We find that none of these auto correlations lie within the blue dotted bands, hence we can say that all these of these are significant and remain close to 1 over many lag periods. Significant auto correlations imply that the observations of long past influences current observation. This also indicates that **the original series is non stationary**
+  
+
+### Partial auto correlation and auto correlation are actually the same, except for the fact that partial auto correlation excludes the effect of the intervening periods or lags while correlating.
+
+  For example, _PACF(1) = ACF(1)_ as the correlation between original and lag1 will be the same for both, and there is no intervening periods in between. But PACF(2) is the correlation between the **original and lag2 series** after the effect or influence of lag1 series is eliminated. The same goes on for PACF(50) where the influence of lag1 upto lag49 is eliminated for the correlation between original series and the lag50 series. This is ideally the only difference between them.
+  
+```{r}
+
+# Partail Auto correlation on original data
+
+pacf(gts, lag.max = 50)
+
+pacf(gts, lag.max = 100)
+
+# A mix of significant and insignificant correlations found
+
+```
+
+  We see that upto lag 49, there is a mix of observations or correlations being significant and the vice. But beyond lag 50, we see that all of the correlations lie within the blue dotted region proving insignificance.There is a mix of both positive and negative correlation.
+  
+  We see that the partial auto correlation of the original with lag 1 is close to 1, also when excluding influence of lag 1 for correlation between original and lag 2, we see that it is still significant though being negative. But when it comes to correlation between original and lag 3, the significance is not there without excluding the influence of lag 1 and lag 2. Likewise, there are certain correlations that even upon excluding the effect of the intervening period, remain significant.
+  
+  This may tell that for a regression model, the response (current value) depends not only on the immediate previous value, as there are a few consecutive significant correlations and the data throughout the previous years maybe necessary for prediction.
+  
+## ACF and PACF on Differenced Series:
+
+  From the earlier acf and pacf we have found that all the correlations have given a value nearer to 1. This proves non stationarity of the series. Hence we are conducting the acf and pacf on the **differenced series**. 
+  
+```{r}
+
+# ACF and PACF on differenced series
+Acf(gts.df, lag.max = 50)
+
+Pacf(gts.df, lag.max = 50)
+
+# ACF cuts off after lag 1, so q=1
+# PACF cuts off after 10. p=10
+
+```
+
+## ARIMA Model:
+
+```{r}
+
+# Split data to train and test
+
+gtstrain = window(DeseasonGas1, start = 1956, end = c(1987,12))
+gtstest = window(DeseasonGas1, start = 1988, end = c(1995,8))  
+  
+# Conducting the ARIMA model:
+
+gtsARIMA = arima(gtstrain, order = c(2,1,10)) 
+gtsARIMA
+
+tsdisplay(residuals(gtsARIMA), lag.max = 15, main = "Model Residuals")
+```
+
+  From this residual plot, we find that there is some amount of seasonality present in the plot. This is also evident from the ACF and PACF plots, which show some significant correlation present. Thus, this may not be the best model to predict on. Hence, we will have to build a better model
+  
+```{r}
+
+# ARIMA model 2
+
+gtsARIMA2 = arima(gtstrain, order = c(2,1,20)) 
+gtsARIMA2
+
+tsdisplay(residuals(gtsARIMA2), lag.max = 15, main = "Model 2 Residuals")
+
+```
+
+  This model is much better than the previous one. And we see that there is a pattern in the beginning of the graph but transforms to a pattern less graph after 1970. Even the ACF and PACF has done better. 
+  
+
+## Fitting with Auto Arima
+
+```{r}
+
+# let us use auto.arima
+
+#auto.arima(gtstrain, ic = "aic", trace = TRUE)
+
+fit = auto.arima(gtstrain, seasonal = FALSE)
+tsdisplay(residuals(fit), lag.max = 30, main = "Auto Arima Model")
+
+# We see that there this is not a proper model
+# Not a random pattern in the plot
+# The acf and pacf plots identify some correlations
+
+```
+
+## Diagnosis by Ljung box test:
+
+* H0 - Residuals are independent
+
+* Ha - Residuals are not independent
+
+```{r}
+# Diagnosis by Ljung box test:
+
+Box.test(gtsARIMA$residuals)
+
+```
+
+  Since we have p value more than 0.05, we have not rejected the null hypothesis and confirm the **residuals are independent**
+  
+## Forecast with ARIMA Model:
+
+ We are asked to forecast for the next 12 periods. Let us do that
+ 
+```{r}
+
+fcast12 = forecast(fit, h=12)
+
+plot(fcast12)
+
+# This has not captured any seasonality as we have deseasonalised the series
+
+# Accuracy:
+
+accuracy(forecast(fit), gtstest)
+
+# Though it is pretty less for the test, for the train, it is not a good model as it shows an error of 64
+
+
+```
+
+## Report:
+
+  We find that the ARIMA model was okay for the test data set by considering the mape value. But the model still is not a great one. We have found that the auto arima has not performed well or given a good result 

@@ -1,0 +1,574 @@
+---
+title: "Predictive Modelling Project"
+author: "Sanju Hyacinth C"
+date: "10/08/2019"
+output:
+  word_document:
+    fig_caption: yes
+    toc: yes
+  html_document:
+    df_print: paged
+    toc: yes
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Problem Statement:
+
+  Customer Churn is a burning problem for Telecom companies. In this project, we simulate one such case of customer churn where we work on a data of postpaid customers with a contract. The data has information about the customer usage behavior, contract details and the payment details. The data also indicates which were the customers who canceled their service. Based on this past data, we need to build a model which can predict whether a customer will cancel their service in the future or not.
+  
+# Problem Objective:
+
+  We need to build a working model which can predict if the customer will cancel or retain their service in the future, based on the past data available to us. 
+  
+
+# 1.  Exploratory Data Analysis:
+
+## 1.1 Installing the required packages:
+
+```{r}
+#install.packages("DataExplorer")
+#install.packages("car")
+#install.packages("dplyr")
+#install.packages("caTools")
+#install.packages("ROCR")
+#install.packages("e1071")
+#install.packages("mlbench")
+#install.packages("lars")
+#install.packages("elasticnet")
+#install.packages("LiblineaR")
+#install.packages("kknn")
+#install.packages("klaR")
+```
+ 
+## 1.2 Data loading
+```{r}
+
+setwd("D:/R Progms")
+
+celldt = readxl::read_xlsx("Cellphone.xlsx", sheet = 2)
+
+head(celldt)
+
+```
+
+## 1.3  Checking for Missing values:
+
+```{r}
+
+library(DataExplorer)
+
+plot_missing(celldt)
+
+# We find no NA values, hence no removing or imputation of data is required
+```
+
+
+## 1.4 Data structure:
+
+```{r}
+
+str(celldt)
+
+# All of the data types are numeric. We shall later convert the churn, contractrenewal and dataplan to factor variables
+
+summary(celldt)
+
+# from the summary,we find that there are no negative or NA values. 
+
+```
+
+## 1.5 Univariate Analysis - Identifying Outliers:
+
+```{r}
+library(ggplot2)
+
+# Excluding Churn, ContractRenewal and DataPlan as their range is between 0 and 1
+
+# 1. Account Weeks:
+
+summary(celldt$AccountWeeks)
+
+boxplot(celldt$AccountWeeks, data = celldt, col = "tomato")
+# Contains outliers
+
+# 2. Data Usage
+
+summary(celldt$DataUsage)
+
+boxplot(celldt$DataUsage, data = celldt, col = "orange")
+# both min value and median is 0
+# the variable contains outliers
+
+# 3. Customer Service Calls:
+
+summary(celldt$CustServCalls)
+
+boxplot(celldt$CustServCalls, data = celldt, col = "purple")
+
+# we find that there are outliers as most of them make customer service calls between 0-2
+
+# 4. Day Minutes:
+
+summary(celldt$DayMins)
+
+boxplot(celldt$DayMins, data = celldt, col = "aquamarine4")
+
+# the majority range of data is between 140 - 210, and the median is 179.
+# outliers present beyond 300 and below 50
+
+# 5. Day Calls:
+
+summary(celldt$DayCalls)
+
+boxplot(celldt$DayCalls, data = celldt, col = "lemonchiffon")
+# outliers present
+
+# 6. Monthly Charge:
+
+summary(celldt$MonthlyCharge)
+
+boxplot(celldt$MonthlyCharge, data = celldt, col = "pink")
+# outliers are present in the data
+
+# 7. Overage Fee:
+
+summary(celldt$OverageFee)
+
+boxplot(celldt$OverageFee, data = celldt, col = "light blue")
+# outliers present in the data
+
+# 8. Roam Minutes:
+
+summary(celldt$RoamMins)
+
+boxplot(celldt$RoamMins, data = celldt, col = "pale green")
+# outliers present in the data
+
+```
+
+  From the boxplots, we find that all the numeric variables contain outliers (extreme values).
+
+
+## 1.6 Correlation matrix:
+
+```{r}
+library(corrplot)
+
+cellcorr = corrplot(cor(celldt[, c(2, 5:11)]), method = "square", title = "Correlation Matrix", tl.cex = 0.8, tl.col = "dark blue")
+
+library(DataExplorer)
+
+plot_correlation(celldt, type = "c")
+
+```
+
+### 1.6.1 Inference from Correlation Plot:
+
+From the correlation plot, we find that there is a:
+  
+  1. Very high correlation between Data Usage and Data Plan
+  
+  2. High correlation between Data Plan and Monthly Charge, as well as between Data Usage and Monthly Charge
+  
+  3. A good amount of correlation between Monthly Charge and DayMins
+  
+  Hence, we can fairly assume that there is a presence of collinearity between a few independent variables.
+
+
+### 1.6.2 Multi Collinearity Remedy:
+
+  A data with multicollinearity can be dealt with using a method called **Variance Inflation Method** by removing the highly correlated variables. The variables having VIF value more than 5 are assumed to be highly correlated. Hence, we will have to do a regression model on the dependent variable with all the independent variables. If all the variables are found to be having a VIF value less than 5, we can go about the problem without the need to remove any variables. But if we find variables having a higher VIF than 5, we will need to remove the variables one by one from the highest VIF. Upon performing regression with the other variables, we will eventually repeat the same steps to arrive at a consistent model with independent variables having VIF less than 5.
+
+```{r}
+# Regression model
+
+library(car)
+
+# Running the model on all independent variables:
+mod1 = lm(Churn~. , data = celldt)
+summary(mod1)
+vif(mod1)
+
+mod2 = lm(Churn~AccountWeeks+ContractRenewal+DataPlan+DataUsage+CustServCalls+DayMins+DayCalls+OverageFee+RoamMins, data = celldt)
+summary(mod2)
+vif(mod2)
+
+mod3 = lm(Churn~AccountWeeks+ContractRenewal+DataPlan+CustServCalls+DayMins+DayCalls+OverageFee+RoamMins, data = celldt)
+summary(mod3)
+vif(mod3)
+
+# AIC (Akaike information criterion) to assess model quality:
+
+AIC(mod1)
+AIC(mod2)
+AIC(mod3)
+
+```
+
+### 1.6.3 Model Analysis
+
+Let us analyse the models.
+  
+* While performing linear regression mod1, we find that the model explains 17% variability with only 3 variables significant, though there are 10 independent variables. But we find that the overall model is significant with **p value 2.2e-16**. We have then conducted VIF on the model in order to confirm the presence of multicollinearity. We find the independent variable **MonthlyCharge** to have the highest VIF value.
+
+* In performing the second linear regression model (mod2) with the variable MonthlyCharge removed, we arrive at model that now has 5 significant independent variables out of the 9. Upon running the VIF function on this model, we now have values of 1 plus for most variables except for the variables of data plan and usage
+
+* We have thus removed the next variable with the highest vif value (DataUsage) and conduct regression. We noe have a model with 6 significant variables out of the 8 that explain the variability. The Vif of this model provides an image of all the VIFs being about 1. 
+
+This is a remedy to remove multicollinearity in order to construct stable models
+
+
+## 1.7 Bivariate Analysis - Plots and Inferences:
+
+```{r}
+# Converting the required fields from numerics to factors 
+
+celldt$Churn = factor(celldt$Churn)
+celldt$ContractRenewal = factor(celldt$ContractRenewal)
+celldt$DataPlan = factor(celldt$DataPlan)
+
+str(celldt)
+
+library(ggplot2)
+
+den.plot <- ggplot(data=celldt, aes(x=celldt$MonthlyCharge, fill=celldt$Churn))
+den.plot + geom_density(stat="density", alpha=I(0.2)) + xlab("Monthly Bill") +  ylab("Density") + ggtitle("Histogram & Density Curve of Monthly Bill")
+
+# The above plot shows that people tend to churn out with an increase in Monthly Bill. A higher range of monthly bill (more than 60) shows a higher intensity of churn rate, whilst most people retain to the service in case of lower monthly Charge. There are also instances when churn rate exists in lower monthly charge and retention in the higher monthly charge levels.
+
+p1 = ggplot(data = celldt) + geom_histogram(mapping = aes(x = celldt$MonthlyCharge, fill = celldt$Churn), position = "identity")
+p1
+
+# This plot is another illustration as the above which shows the churn out intensifies a bit as the monthly charge is specially between 60 to 70, after which the churn rate drops down. Although the people who retained the service is the highest upto 60, is comes down a little as the monthly bill increases.
+
+p2 = ggplot(data = celldt) + geom_histogram(mapping = aes(x = celldt$DataUsage, fill = celldt$DataPlan), position = "identity")
+p2
+
+# This plot shows it is mostly people with a data plan highly use the mobile data. We can also see the majority of the people do not have a data plan and use the data, whilst there are just a few who have a dataplan and not use mobile data.
+  
+p2.1 = ggplot(data = celldt,aes(y= celldt$DataUsage, x= celldt$MonthlyCharge))+
+  geom_point(aes(color = celldt$Churn, shape = celldt$DataPlan)) 
+p2.1
+
+# This plot is interesting as we can observe 4 things in one plot. Most people use the mobile data whilst having a data plan. And a higher percentage of these people do not churn with people only churning out beyond 60 of monthly charge.
+
+# It is interesting to note from the plot that the person with lowest monthly charge without a data plan and the person with almost the highest monthly charge with a data plan have both churned out.
+
+# There are people who have churned out without having a data plan and much data usage, intensifying in the higher range of monthly charge where there are only a few people who retained  beyond the range.
+
+p3 = ggplot(data = celldt, aes(x=celldt$Churn, y=celldt$CustServCalls)) + geom_boxplot(aes(fill = celldt$Churn))
+p31 = p3 + labs(title = "Customer service calls",x="Churn", y="Customer calls",fill = "Churn")
+p32 = p31 + theme(panel.background = element_rect(fill = "light grey"))
+p32
+
+# In this plot we find that the median customer service calls made by the people who retained the service is about 1, while the median customer service calls made by the people who churned is 2. We can also see that there are outliers present for retention as there are people who made more calls than 2 to a maximum of 8 calls have also retained the service. We find that the person who churned out made the most calls of 9. 
+
+p4 = ggplot(data = celldt,aes(y= celldt$DayMins, x= celldt$DayCalls, col = celldt$Churn))+ geom_point() + geom_smooth(method = "lm",se = F)+ facet_grid(~celldt$Churn) + facet_wrap(~celldt$Churn, ncol = 2)
+p4
+
+# This scatter plot shows a trend line that shows the increase or decrease of day minutes with respect to day calls, separated by the churn variable. We can see from the plot that the retention rate is more than churn out rate, and that it follows a rather negative trend line (daymins decreases with increase in day calls) But on the other hand, the people who churned out are less in number, and the trend is positive (day mins increases with day calls)
+
+p5 = ggplot(data = celldt,aes(y= celldt$DayMins, x= celldt$MonthlyCharge))+
+  geom_point(aes(color = celldt$Churn, shape = celldt$DataPlan))
+p5
+
+# The first thing we see from this plot is that, the trend is a positive one (an increase in day minutes increases the monthly charge) It is classified on the basis of data plan and churn rate.Most of them without a data plan and monthly charge less than 60, show retention. Though there are many who show retention with a data plan and charge more than 60. But the intensity of churn out rate of people without data plan is more between 60-80 monthly charge.
+
+# We can safely assume that many people without a data plan have churned out.
+
+p6 = ggplot(data = celldt, aes(x=celldt$DataPlan, y=celldt$RoamMins)) + geom_boxplot(aes(fill = celldt$Churn))
+p6
+ 
+# In this boxplot for both the cases where people have a dataplan or not, the roaming minutes is in the same range for the people who have retained the service, although there are extreme values for both on either sides. But the blue areas show a difference, the median has comparatively increased and the churn rate is higher with people having a data plan.
+
+p7 = ggplot(data = celldt, aes(x=celldt$DataPlan, y=celldt$DayMins)) + geom_boxplot(aes(fill = celldt$Churn))
+p7
+
+# This plot shows in both cases of churning, how has having a data plan or not affected the day call minutes. In both the cases of data plans (0 or 1) here the people have retained the service, the day minutes range seems to be similar with a median of 175-180. But in case of churning out, people without a data plan seem to use more day minutes whereas people with a data plan use lesser day minutes. 
+
+# Also people without a data plan have not used much mobile data thereby only making calls, and the people with a dataplan have reduced a bit on their daycalls and used more data. But on both occasions, they have left the service.
+
+```
+
+```{r}
+xtabs(~ Churn+DataPlan, data = celldt)
+
+xtabs(~ Churn+ContractRenewal, data = celldt)
+
+```
+
+# 2.  Model Building:
+
+## 2.1 Logistic Regression:
+
+```{r}
+
+# binomial tells the model to produce a logistic regression model
+
+logit = glm(Churn~., data = celldt, family = "binomial")
+summary(logit)
+
+# spliting data to train and test
+
+library(caTools)
+set.seed(1234)
+spl.cd = sample.split(celldt,SplitRatio = 0.7)
+ctrain = subset(celldt,spl.cd == TRUE)
+ctest = subset(celldt, spl.cd == FALSE)
+
+# Logistic Model 1
+
+logit1 = glm(Churn~., data = ctrain, family = "binomial")
+summary(logit1)
+
+# From this logistic regression model on the train data, we find that there are 3 significant variables
+
+# Let us now predict on the test data and obtain the confusio matrix
+ctest.pred = predict(logit1, newdata = ctest, type = "response")
+table(ctest$Churn, ctest.pred>0.5)
+
+# Accuracy
+(999+39)/nrow(ctest)
+
+# Let us view the accuracy of the original data 
+table(celldt$Churn)
+prop.table(table(celldt$Churn))
+
+# We find that the accuracy of the original data is almost the same to the test data.
+# We can assume that accuracy is not very important in this instance
+
+library(ROCR)
+rocr.pred = prediction(ctest.pred, ctest$Churn)
+
+# Area Under the Curve is calculated
+as.numeric(performance(rocr.pred, "auc")@y.values)
+
+# 83 percent of the time, the model has given correct predictions
+
+cperf = performance(rocr.pred, "tpr", "fpr")
+plot(cperf)
+
+# false positive rate is very important for this data where we should know that the model has correctly predicted most of the time. Here in this instance we can see the model has wrongly predicted just 3 percent of the time, with correct predictions 97 percent of the time.
+
+34/(999+34)
+
+```
+
+## 2.2  K Nearest Neighbour Algorithm:
+
+  KNN, as it is popularly called, is a Supervised Machine Learning algorithm that helps to classify a data point to it's assigned variable or target class, by analysing the nearest neighbours of the data point. Hence the name, nearest neighbour. And K is the value we assign to the model in order for the algorithm to focus on the desired K number of neighbours for analysis.
+  KNN works only on numerical variables as it involves calculation of distances between each datapoint of the numeric variable. Mostly, the assigned K value is **odd** to avoid any ties between the selected data point.
+  
+  Let us go about the algorithm
+  
+### 2.2.1  Data Exploring:
+```{r}
+# Load the dataset, read and understand it's structure:
+
+datac = readxl::read_xlsx("Cellphone.xlsx", sheet = 2)
+
+str(datac)
+
+summary(datac)
+
+# We should make sure to remove any na or missing values from the data.
+# In our case, there are no missing values present.
+
+```
+
+### 2.2.2  Normalising the Data:
+
+  In order to develop a proper algorithm, KNN uses normalised data. In a data, we may have datapoints that are not same in their measurements. In order to bring these datapoints to a standard measurement, we do the **normalisation of datapoints**. Upon doing this, we can find all the datapoints ranging between 0 and 1 thus facilitating the development of a good and unbiased model. 
+  
+  Let us normalise the data with the below fundction
+  
+```{r}
+# Normalizing the data
+
+norm = function(x) { (x- min(x))/(max(x) - min(x)) }
+
+# eliminating the dependent variable
+norm.data = as.data.frame(lapply(datac[,-1], norm))
+
+# Bring back the dependent variable to the normalised data:
+usable.data = cbind(datac[,1], norm.data)
+
+str(usable.data)
+
+View(usable.data)
+
+```
+
+### 2.2.3  KNN Classification:
+
+  Let us now partition the data into training and testing data, after which we will run the KNN algorithm. Here is where we will select the correct number for K. One thing to keep in mind is an **optimum number for K is what that will produce a good model**. A smaller k will result in a rather overfitting model and a larger k may not capture as much details from the data, thereby missing on important ones.
+  
+  By default, K can take a value of 19 or the square root of the number of observations in the data. But we have to make sure to select the optimum number so as to avoid over or under fitting of the model.
+  
+```{r}
+# Data partitioning
+
+library(caTools)
+
+set.seed(2000)
+spl = sample.split(usable.data$Churn, SplitRatio = 0.7)
+train = subset(usable.data, spl == T)
+test = subset(usable.data, spl == F)
+
+# KNN Classifier:
+table(sqrt(3333), sqrt(2333))
+
+# taking k=19 first as the sqrt of the dataset is about 58.
+
+library(class)
+
+pred1 = knn(train[-1], test[-1], train[,1], k = 19) 
+table.knn1 = table(test[,1], pred1)
+sum(diag(table.knn1)/sum(table.knn1))
+# Accuracy of 89.1 keeping k as 19
+
+# Assigning the sqrt values of 57 and 58
+
+pred2 = knn(train[-1], test[-1], train[,1], k = 58)
+table.knn2 = table(test[,1], pred2)
+sum(diag(table.knn2)/sum(table.knn2))
+# Accuracy of 87.8
+
+
+pred = knn(train[-1], test[-1], train[,1], k = 57)
+table.knn = table(test[,1], pred)
+sum(diag(table.knn)/sum(table.knn))
+# Accuracy of 88
+
+pred3 = knn(train[-1], test[-1], train[,1], k = 56)
+table.knn3 = table(test[,1], pred3)
+sum(diag(table.knn3)/sum(table.knn3))
+# Accuracy of 88.1
+
+pred4 = knn(train[-1], test[-1], train[,1], k = 55)
+table.knn4 = table(test[,1], pred4)
+sum(diag(table.knn4)/sum(table.knn4))
+# Accuracy of 88
+
+# The difference in accuracy from 19 to 57 is not a lot. But between 57 and 58, the accuracy has dropped by .2 points. As per understanding, the accuracy from 57 to 56 has increased. But it seemed to have come down at K = 55. The optimum number of k here may be assumed to be 57 or 56
+
+```
+
+## 2.3 Naïve  Bayes:
+
+  Naïve Bayes, an extremely powerful tool, is technically used only when the data set has all of its variables in a categorical format. However, it can also be used with continuous features but is more suited to categorical variables. Naïve Bayes is a recommended algorithm if all the independent and dependent variables are categorical. Naïve Bayes is a parametric algorithm. Hence, we may not obtain different results upon re executing the function unless the data remains unchanged.
+  
+  In our case, although our dependent variable is categorical (as in the case of any data with a problem statement), most of our dependent variables are of numeric format.
+
+```{r}
+
+# e1071 has the naiveBayes function 
+library(e1071)
+
+# training the model on the train dataset
+NB = naiveBayes(Churn~., data = train)
+print(NB)
+
+# Changing the numeric fields to factors:
+train$Churn = factor(train$Churn)
+train$ContractRenewal = factor(train$ContractRenewal)
+train$DataPlan = factor(train$DataPlan)
+test$Churn = factor(test$Churn)
+test$ContractRenewal = factor(test$ContractRenewal)
+test$DataPlan = factor(test$DataPlan)
+
+# Creating naiveBayes model only on categorical variables
+NB1 = naiveBayes(Churn~ContractRenewal+DataPlan, data = train)
+print(NB1)
+
+# A priori probabilities and Conditional probabilities 
+# Conditional probabilities for the categorical variables are given correctly in the summary of the model
+# Even from this model we can justify that many people who have cancelled the service have been without a data plan. Also most of them without a data plan have not churned out
+
+```
+
+## 2.4  Model Comparison Using Model Performance Metrics - Regression
+
+### 2.4.1  Model Performance Metrics - Regression:
+
+```{r}
+
+# loading the fresh data:
+celldt = readxl::read_xlsx("Cellphone.xlsx", sheet = 2)
+
+str(celldt)
+
+library(mlbench)
+library(caret)
+library(lars)
+library(elasticnet)
+
+# CROSS VALIDATION: technique used is K Fold cross validation 
+#  prepare training scheme
+
+control <- trainControl(method = "repeatedcv", number = 10, repeats = 2)
+
+```
+```{r}
+
+# train the Linear Regression model
+
+set.seed(2000)
+celldt.reg = celldt[,c(-3,-4)]
+model.ols <- train(Churn ~., data = celldt.reg, method = "lm", trControl = control)
+
+# train the Lasso model
+
+set.seed(2000)
+
+model.Lasso <- train(Churn ~., data = celldt.reg, method = "lasso", trControl = control)
+
+# train the ridge model:
+
+set.seed(2000)
+
+model.Ridge <- train(Churn ~., data = celldt.reg, method = "ridge", trControl = control)
+
+```
+
+```{r}
+
+# collect resamples
+
+results <- resamples(list(OLS = model.ols, LASSO = model.Lasso, Ridge = model.Ridge))
+
+# summarizing the distributions
+
+summary(results)
+
+# OLS has the least median Root Mean Square Error (RMSE) of 0.329 when compared to the models of LASSO and RIDGE
+# And it also has the highest median and mean R Squared of 0.1037 and 0.1082
+# We find that the other two models are close to each other and quite far apart from OLS.
+
+# Boxplot results:
+
+bwplot(results)
+
+```
+
+
+### 2.4.2  Model Performance Metrics - Interpretation:
+
+* OLS has the least median Root Mean Square Error (RMSE) of 0.329 when compared to the models of LASSO and RIDGE
+
+* And it also has the highest median and mean R Squared of 0.1037 and 0.1082
+
+* We find that the other two models are close to each other and quite far apart from OLS
+
+
+## 2.5  Insights:
+
+The data is clear from all negative or Na values.
+We have found that the Naive Bayes model would not be the ideal model as most of the data is numerical, but prpduces a good accuracy. KNN also performed well with accuracy of 88 percent.
+
+
+
+
